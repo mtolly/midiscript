@@ -230,14 +230,8 @@ readTempoTrack evts = let
     isNow p = case p of
       Absolute r -> r == pos
       Measures m r -> or
-        [ and
-          [ m == msr
-          , r == 0
-          ]
-        , and
-          [ m < msr
-          , NN.toNumber (sum $ take m msrList) + r == pos
-          ]
+        [ m == msr && r == 0
+        , m <  msr && NN.toNumber (sum $ take m msrList) + r == pos
         ]
     newSig = case filter (isNow . fst) sigs of
       (_, s) : _ -> s
