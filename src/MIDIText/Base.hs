@@ -116,11 +116,12 @@ showFraction rat = let
   (num, denom) = (numerator part, denominator part)
   in if part == 0
     then show (whole :: Integer)
-    else concat $ case part of
-      0.25 -> [show whole, ".25"]
-      0.5  -> [show whole, ".5"]
-      0.75 -> [show whole, ".75"]
-      _    -> [show whole, "+(", show num, "/", show denom, ")"]
+    else concat $ case quotRem 100 denom of
+      (q, 0) -> let
+        rdrop0 = reverse . dropWhile (== '0') . reverse
+        hundredths = num * q
+        in [show whole, ".", rdrop0 $ show hundredths]
+      _ -> [show whole, "+(", show num, "/", show denom, ")"]
 
 showAsMeasure :: [NN.Rational] -> NN.Rational -> String
 showAsMeasure = go 0 where
