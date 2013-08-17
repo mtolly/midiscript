@@ -142,7 +142,8 @@ showStandardMIDI m = let
     , ";\n"
     ]
   sortedTracks = sortBy (comparing fst) $ namedTracks m
-  allTracks = ("tempo", tempoTrack m) : map (first show) sortedTracks
+  allTracks = ("tempo", tempoTrack m) : named
+  named = map (first $ \n -> unwords [show n, "ch", "0"]) sortedTracks
   in concatMap (\(n, t) -> n ++ " " ++ showTrack t ++ "\n\n") allTracks
 
 -- | Groups events by absolute time, and sorts concurrent events.
@@ -174,25 +175,29 @@ showEvent evt = unwords $ case evt of
     M.SequencerSpecific _bytes -> undefined
     M.Unknown _n _bytes -> undefined
     where listParens xs = "(" ++ intercalate ", " xs ++ ")"
-  E.MIDIEvent (C.Cons ch body) -> "ch" : show (C.fromChannel ch) : case body of
-    C.Voice x -> case x of
-      V.NoteOn p v ->
-        ["on", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
-      V.NoteOff p v ->
-        ["off", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
-      V.PolyAftertouch p v -> ["after", show $ V.fromPitch p, "v", show v]
-      V.ProgramChange p -> ["pc", show $ V.fromProgram p]
-      V.Control c v -> ["con", show $ Con.toInt c, "v", show v]
-      V.PitchBend v -> ["bend", show v]
-      V.MonoAftertouch v -> ["after", "v", show v]
-    C.Mode x -> case x of
-      Mode.AllSoundOff -> ["soundoff"]
-      Mode.ResetAllControllers -> ["reset"]
-      Mode.LocalControl b -> ["local", if b then "true" else "false"]
-      Mode.AllNotesOff -> ["notesoff"]
-      Mode.OmniMode b -> ["omni", if b then "true" else "false"]
-      Mode.MonoMode i -> ["mono", show i]
-      Mode.PolyMode -> ["poly"]
+  E.MIDIEvent (C.Cons ch body) -> let
+    showChannel = case C.fromChannel ch of
+      0 -> []
+      c -> ["ch", show c]
+    in showChannel ++ case body of
+      C.Voice x -> case x of
+        V.NoteOn p v ->
+          ["on", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
+        V.NoteOff p v ->
+          ["off", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
+        V.PolyAftertouch p v -> ["after", show $ V.fromPitch p, "v", show v]
+        V.ProgramChange p -> ["pc", show $ V.fromProgram p]
+        V.Control c v -> ["con", show $ Con.toInt c, "v", show v]
+        V.PitchBend v -> ["bend", show v]
+        V.MonoAftertouch v -> ["after", "v", show v]
+      C.Mode x -> case x of
+        Mode.AllSoundOff -> ["soundoff"]
+        Mode.ResetAllControllers -> ["reset"]
+        Mode.LocalControl b -> ["local", if b then "true" else "false"]
+        Mode.AllNotesOff -> ["notesoff"]
+        Mode.OmniMode b -> ["omni", if b then "true" else "false"]
+        Mode.MonoMode i -> ["mono", show i]
+        Mode.PolyMode -> ["poly"]
   E.SystemExclusive ex -> case ex of
     SysEx.Regular _bytes -> undefined
     SysEx.Escape _bytes -> undefined
