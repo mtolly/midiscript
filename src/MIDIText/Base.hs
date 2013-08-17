@@ -22,6 +22,7 @@ import Data.Ratio
 import Data.Maybe
 import Data.List.HT (partitionMaybe)
 import Control.Arrow (first)
+import Control.Monad (guard)
 import Data.List (sort, sortBy, intercalate)
 import Data.Char (toLower)
 import Data.Ord (comparing)
@@ -115,7 +116,11 @@ showFraction rat = let
   (num, denom) = (numerator part, denominator part)
   in if part == 0
     then show (whole :: Integer)
-    else concat [show whole, "+(", show num, "/", show denom, ")"]
+    else concat $ case part of
+      0.25 -> [show whole, ".25"]
+      0.5  -> [show whole, ".5"]
+      0.75 -> [show whole, ".75"]
+      _    -> [show whole, "+(", show num, "/", show denom, ")"]
 
 showAsMeasure :: [NN.Rational] -> NN.Rational -> String
 showAsMeasure = go 0 where
@@ -160,7 +165,10 @@ showEvent evt = unwords $ case evt of
     M.EndOfTrack -> ["end"]
     M.SetTempo i -> ["tempo", show i]
     M.SMPTEOffset h m s f b -> ["smpte", listParens $ map show [h, m, s, f, b]]
-    M.TimeSig a b c d -> ["time", listParens $ map show [a, b, c, d]]
+    M.TimeSig a b c d -> "time" : let
+      rest = guard ((c, d) /= (24, 8)) >> [show c, show d]
+      nd = unwords [show a, "|", show $ (2 :: Integer) ^ b]
+      in [listParens $ nd : rest]
     M.KeySig (Key.Cons mode (Key.Accidentals n)) ->
       ["key", map toLower $ show mode, show n]
     M.SequencerSpecific _bytes -> undefined
