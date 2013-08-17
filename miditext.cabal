@@ -13,7 +13,10 @@ Library
                     , midi
                     , event-list
                     , utility-ht
+                    , array
   Exposed-modules:  MIDIText.Base
+                    MIDIText.Scan
+                    MIDIText.Parse
   hs-source-dirs:   src
   ghc-options:      -Wall
 

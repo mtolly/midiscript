@@ -157,12 +157,13 @@ showEvent evt = unwords $ case evt of
     M.MIDIPrefix ch -> ["prefix", show $ C.fromChannel ch]
     M.EndOfTrack -> ["end"]
     M.SetTempo i -> ["tempo", show i]
-    M.SMPTEOffset h m s f b -> "smpte" : map show [h, m, s, f, b]
-    M.TimeSig a b c d -> "sig" : map show [a, b, c, d]
+    M.SMPTEOffset h m s f b -> ["smpte", listParens $ map show [h, m, s, f, b]]
+    M.TimeSig a b c d -> ["time", listParens $ map show [a, b, c, d]]
     M.KeySig (Key.Cons mode (Key.Accidentals n)) ->
       ["key", map toLower $ show mode, show n]
     M.SequencerSpecific _bytes -> undefined
     M.Unknown _n _bytes -> undefined
+    where listParens xs = "(" ++ intercalate ", " xs ++ ")"
   E.MIDIEvent (C.Cons ch body) -> "ch" : show (C.fromChannel ch) : case body of
     C.Voice x -> case x of
       V.NoteOn p v ->
