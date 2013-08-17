@@ -93,6 +93,7 @@ data Token
   | OmniMode
   | MonoMode
   | PolyMode
+  | BPM
   deriving (Eq, Ord, Show, Read)
 
 identify :: Token' -> Token
@@ -130,6 +131,7 @@ identify (Ident i) = case map toLower i of
   "omni" -> OmniMode
   "mono" -> MonoMode
   "poly" -> PolyMode
+  "bpm" -> BPM
   _ -> error $ "scan: unrecognized bare word " ++ show i
 identify (Token tok) = tok
 

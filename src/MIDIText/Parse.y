@@ -72,6 +72,7 @@ import Data.Maybe (mapMaybe)
   omni { S.OmniMode }
   mono { S.MonoMode }
   poly { S.PolyMode }
+  bpm { S.BPM }
 
 %%
 
@@ -115,8 +116,8 @@ MIDIEvent
   | cue str { E.MetaEvent $ M.CuePoint $2 }
   | prefix Int { E.MetaEvent $ M.MIDIPrefix $ C.toChannel $2 }
   | end { E.MetaEvent M.EndOfTrack }
-  | tempo Int
-    { E.MetaEvent $ M.SetTempo $ M.toTempo $2 }
+  | tempo Tempo
+    { E.MetaEvent $ M.SetTempo $2 }
   | smpte '(' Int ',' Int ',' Int ',' Int ',' Int ')'
     { E.MetaEvent $ M.SMPTEOffset $3 $5 $7 $9 $11 }
   | time '(' TimeSig ClockDetails ')'
@@ -127,6 +128,14 @@ MIDIEvent
     { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
   | MIDIBody
     { E.MIDIEvent $ C.Cons (C.toChannel 0) $1 }
+
+Tempo
+  : Int { M.toTempo $1 }
+  | Rat bpm { let
+    beatPerMinute = $1
+    microsecPerMinute = 60 * 1000000
+    in M.toTempo $ floor $ microsecPerMinute / beatPerMinute
+    }
 
 -- Parses the numerator and denominator of a time signature.
 TimeSig
