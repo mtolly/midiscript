@@ -230,7 +230,10 @@ readTempoTrack evts = let
     isNow p = case p of
       Absolute r -> r == pos
       Measures m r -> or
-        [ m == msr
+        [ and
+          [ m == msr
+          , r == 0
+          ]
         , and
           [ m < msr
           , NN.toNumber (sum $ take m msrList) + r == pos
