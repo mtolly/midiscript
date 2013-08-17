@@ -1,4 +1,5 @@
 {
+{-# OPTIONS_GHC -fwarn-unused-imports #-}
 module MIDIText.Parse (parse) where
 
 import qualified MIDIText.Scan as S
@@ -11,10 +12,9 @@ import qualified Sound.MIDI.Controller as Con
 import qualified Sound.MIDI.KeySignature as Key
 import qualified Data.EventList.Relative.TimeBody as RTB
 import qualified Data.EventList.Absolute.TimeBody as ATB
-import qualified Numeric.NonNegative.Class as NN
 import qualified Numeric.NonNegative.Wrapper as NN
 import MIDIText.Base
-import Data.Maybe (mapMaybe)
+import Control.Arrow (first, second)
 
 }
 
@@ -72,15 +72,19 @@ import Data.Maybe (mapMaybe)
 
 %%
 
+File
+  : MIDITracks { listsToMIDI [] $1 }
+  | TempoTrack MIDITracks { listsToMIDI $1 $2 }
+
+TempoTrack
+  : tempo '{' MIDIEventLines '}' { $3 }
+
 MIDITracks
   : { [] }
   | MIDITrack MIDITracks { $1 : $2 }
 
 MIDITrack
-  : str '{' MIDIEventLines '}'
-    { NamedTrack $1 $3 }
-  | tempo '{' MIDIEventLines '}'
-    { TempoTrack $3 }
+  : str '{' MIDIEventLines '}' { ($1, $3) }
 
 MIDIEventLines
   : { [] }
@@ -180,9 +184,16 @@ data Position
   | Measures Int Rational
   deriving (Eq, Ord, Show, Read)
 
-data MIDITrack
-  = TempoTrack [(Position, [E.T])]
-  | NamedTrack String [(Position, [E.T])]
-  deriving (Eq, Ord, Show)
+listsToMIDI
+  :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI
+listsToMIDI tmp named = let
+  toRTB = RTB.flatten . RTB.fromAbsoluteEventList . ATB.fromPairList . map (first posToRat)
+  tmpRTB = toRTB tmp
+  msrs = makeMeasures tmpRTB
+  posToRat pos = case pos of
+    Absolute r -> NN.fromNumber r
+    Measures m r -> sum (take m msrs) + NN.fromNumber r
+  namedRTBs = map (second toRTB) named
+  in StandardMIDI tmpRTB namedRTBs
 
 }
