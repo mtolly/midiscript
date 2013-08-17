@@ -27,7 +27,7 @@ import Data.Maybe (mapMaybe)
 
 %token
   str { S.Str $$ }
-  int { S.Int $$ }
+  rat { S.Rat $$ }
   '+' { S.Plus }
   '-' { S.Dash }
   '*' { S.Star }
@@ -188,7 +188,7 @@ Rat0
 Rat1
   : '(' Rat ')' { $2 }
   | '-' Rat1 { $2 }
-  | int { fromIntegral $1 :: Rational }
+  | rat { $1 }
 
 {
 

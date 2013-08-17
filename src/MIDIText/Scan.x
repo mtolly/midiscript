@@ -17,7 +17,7 @@ $white+ ;
 
 \" @str_char* \" { Token . Str . read }
 [A-Za-z]+ { Ident }
-[0-9]+ { Token . Int . read }
+[0-9]+ { Token . Rat . fromInteger . read }
 
 "+" { const $ Token Plus }
 "-" { const $ Token Dash }
@@ -41,7 +41,7 @@ data Token'
 
 data Token
   = Str String
-  | Int Integer
+  | Rat Rational
   | Plus
   | Dash
   | Star
