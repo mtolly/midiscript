@@ -119,12 +119,25 @@ MIDIEvent
     { E.MetaEvent $ M.SetTempo $ M.toTempo $2 }
   | smpte '(' Int ',' Int ',' Int ',' Int ',' Int ')'
     { E.MetaEvent $ M.SMPTEOffset $3 $5 $7 $9 $11 }
-  | time '(' Int ',' Int ',' Int ',' Int ')'
-    { E.MetaEvent $ M.TimeSig $3 $5 $7 $9 }
+  | time '(' TimeSig ClockDetails ')'
+    { E.MetaEvent $ M.TimeSig (fst $3) (snd $3) (fst $4) (snd $4) }
   | key Mode Int
     { E.MetaEvent $ M.KeySig $ Key.Cons $2 $ Key.Accidentals $3 }
   | ch Int MIDIBody
     { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
+  | MIDIBody
+    { E.MIDIEvent $ C.Cons (C.toChannel 0) $1 }
+
+-- Parses the numerator and denominator of a time signature.
+TimeSig
+  : Int ',' Int { ($1, $3) }
+  | Int '|' Int { ($1, round $ log (fromIntegral $3) / log 2) }
+
+-- Parses the # of MIDI clocks in a quarter note,
+-- and the number of 32nd notes in a quarter note.
+ClockDetails
+  : ',' Int ',' Int { ($2, $4) }
+  | { (24, 8) }
 
 Mode
   : major { Key.Major }
@@ -207,7 +220,13 @@ readTempoTrack evts = let
   go msr pos sig = let
     isNow p = case p of
       Absolute r -> r == pos
-      Measures m r -> m == msr || (m < msr && NN.toNumber (sum $ take m msrList) + r == pos)
+      Measures m r -> or
+        [ m == msr
+        , and
+          [ m < msr
+          , NN.toNumber (sum $ take m msrList) + r == pos
+          ]
+        ]
     newSig = case filter (isNow . fst) sigs of
       (_, s) : _ -> s
       []         -> sig
