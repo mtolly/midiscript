@@ -89,6 +89,7 @@ MIDITracks
 
 MIDITrack
   : str '{' MIDIEventLines '}' { ($1, $3) }
+  | str ch Int '{' MIDIEventLinesCh '}' { ($1, $5 (C.toChannel $3)) }
 
 MIDIEventLines
   : { [] }
@@ -104,6 +105,21 @@ Position
 MIDIEvents
   : MIDIEvent { [$1] }
   | MIDIEvent ',' MIDIEvents { $1 : $3 }
+
+MIDIEventLinesCh
+  : { \_ch -> [] }
+  | MIDIEventLineCh MIDIEventLinesCh { \ch -> $1 ch : $2 ch }
+
+MIDIEventLineCh
+  : Position ':' MIDIEventsCh ';' { \ch -> ($1, $3 ch) }
+
+MIDIEventsCh
+  : MIDIEventCh { \ch -> [$1 ch] }
+  | MIDIEventCh ',' MIDIEventsCh { \ch -> $1 ch : $3 ch }
+
+MIDIEventCh
+  : MIDIEvent { \_ch -> $1 }
+  | MIDIBody { \ch -> E.MIDIEvent $ C.Cons ch $1 }
 
 MIDIEvent
   : seq Int { E.MetaEvent $ M.SequenceNum $2 }
@@ -126,8 +142,6 @@ MIDIEvent
     { E.MetaEvent $ M.KeySig $ Key.Cons $2 $ Key.Accidentals $3 }
   | ch Int MIDIBody
     { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
-  | MIDIBody
-    { E.MIDIEvent $ C.Cons (C.toChannel 0) $1 }
 
 Tempo
   : Int { M.toTempo $1 }
