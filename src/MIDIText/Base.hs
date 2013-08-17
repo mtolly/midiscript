@@ -89,6 +89,11 @@ dropTime t rtb = case RTB.viewL rtb of
       then {- t <= dt -} RTB.cons d x rtb'
       else {- t >  dt -} dropTime d rtb'
 
+getTimeSig :: E.T -> Maybe NN.Rational
+getTimeSig (E.MetaEvent (M.TimeSig n d _ _)) = Just $
+  fromIntegral n * (2 ^^ (-d)) * 4
+getTimeSig _ = Nothing
+
 -- | Generates an infinite list of measure lengths by reading time signature
 -- events. Assumes 4/4 if there's no event at position 0.
 makeMeasures :: RTB.T NN.Rational E.T -> [NN.Rational]
@@ -97,10 +102,7 @@ makeMeasures = go 4 where
     then repeat len
     else let
       (zs, _) = viewZero rtb
-      newSigs = flip mapMaybe zs $ \z -> case z of
-        E.MetaEvent (M.TimeSig n d _ _) -> Just $
-          fromIntegral n * (2 ^^ (-d)) * 4
-        _ -> Nothing
+      newSigs = mapMaybe getTimeSig zs
       newSig = case newSigs of
         []      -> len
         sig : _ -> sig

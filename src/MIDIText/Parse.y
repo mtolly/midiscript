@@ -15,6 +15,9 @@ import qualified Data.EventList.Absolute.TimeBody as ATB
 import qualified Numeric.NonNegative.Wrapper as NN
 import MIDIText.Base
 import Control.Arrow (first, second)
+import Data.List (sortBy)
+import Data.Ord (comparing)
+import Data.Maybe (mapMaybe)
 
 }
 
@@ -74,7 +77,7 @@ import Control.Arrow (first, second)
 
 File
   : MIDITracks { listsToMIDI [] $1 }
-  | TempoTrack MIDITracks { listsToMIDI $1 $2 }
+  | MIDITracks TempoTrack MIDITracks { listsToMIDI $2 ($1 ++ $3) }
 
 TempoTrack
   : tempo '{' MIDIEventLines '}' { $3 }
@@ -187,13 +190,28 @@ data Position
 listsToMIDI
   :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI
 listsToMIDI tmp named = let
-  toRTB = RTB.flatten . RTB.fromAbsoluteEventList . ATB.fromPairList . map (first posToRat)
-  tmpRTB = toRTB tmp
-  msrs = makeMeasures tmpRTB
+  toRTB = RTB.flatten . RTB.fromAbsoluteEventList . ATB.fromPairList
+    . sortBy (comparing fst) . map (first posToRat)
+  msrs = readTempoTrack tmp
   posToRat pos = case pos of
     Absolute r -> NN.fromNumber r
     Measures m r -> sum (take m msrs) + NN.fromNumber r
   namedRTBs = map (second toRTB) named
-  in StandardMIDI tmpRTB namedRTBs
+  in StandardMIDI (toRTB tmp) namedRTBs
+
+readTempoTrack :: [(Position, [E.T])] -> [NN.Rational]
+readTempoTrack evts = let
+  sigs = [ (pos, s) | (pos, es) <- evts, s <- mapMaybe getTimeSig es ]
+  msrList = go 0 0 4
+  go :: Int -> Rational -> NN.Rational -> [NN.Rational]
+  go msr pos sig = let
+    isNow p = case p of
+      Absolute r -> r == pos
+      Measures m r -> m == msr || (m < msr && NN.toNumber (sum $ take m msrList) + r == pos)
+    newSig = case filter (isNow . fst) sigs of
+      (_, s) : _ -> s
+      []         -> sig
+    in newSig : go (msr + 1) (pos + NN.toNumber newSig) newSig
+  in msrList
 
 }
