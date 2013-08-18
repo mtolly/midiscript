@@ -11,21 +11,35 @@ import System.IO
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as Enc
+import System.Console.GetOpt
+import System.Exit (exitFailure)
+
+options :: [OptDescr (Options -> Options)]
+options =
+  [ Option ['b'] ["beats"] (NoArg $ \o -> o { measurePos = False })
+    "positions in beats"
+  , Option ['m'] ["measures"] (NoArg $ \o -> o { measurePos = True })
+    "positions in measures + beats"
+  ]
 
 main :: IO ()
 main = getArgs >>= \argv -> let
-  input = case argv of
+  (flags, files, errs) = getOpt Permute options argv
+  input = case files of
     f : _ | f /= "-" -> withFile f ReadMode
     _                -> ($ stdin)
-  output = case argv of
+  output = case files of
     _ : f : _ | f /= "-" -> withFile f WriteMode
     _                    -> ($ stdout)
-  in case argv of
-    _ : _ : _ : _ -> printUsage
-    _ -> input $ \h1 -> output $ \h2 -> handles h1 h2
+  in do
+    mapM_ (hPutStrLn stderr) errs
+    case files of
+      _ : _ : _ : _ -> printUsage >> exitFailure
+      _ -> input $ \h1 -> output $ \h2 ->
+        handles (foldr ($) defaultOptions flags) h1 h2
 
-handles :: Handle -> Handle -> IO ()
-handles h1 h2 = do
+handles :: Options -> Handle -> Handle -> IO ()
+handles opts h1 h2 = do
   hSetBinaryMode h1 True
   b1 <- L.hGetContents h1
   let rep = Load.maybeFromByteString b1
@@ -33,9 +47,11 @@ handles h1 h2 = do
     Right mid -> case toStandardMIDI mid of
       Right sm -> do
         hSetBinaryMode h2 False
-        hPutStr h2 $ showStandardMIDI sm
-      Left err -> mapM_ (hPutStrLn stderr)
-        ["Error converting MIDI file to standard form.", err]
+        hPutStr h2 $ showStandardMIDI opts sm
+      Left err -> do
+        mapM_ (hPutStrLn stderr)
+          ["Error converting MIDI file to standard form.", err]
+        exitFailure
     Left _ -> let
       s1 = TL.unpack $ Enc.decodeUtf8 b1
       sm = parse $ scan s1

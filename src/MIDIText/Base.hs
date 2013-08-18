@@ -27,6 +27,15 @@ import Data.List (sort, sortBy, intercalate)
 import Data.Char (toLower)
 import Data.Ord (comparing)
 
+data Options = Options
+  { measurePos :: Bool
+  } deriving (Eq, Ord, Show, Read)
+
+defaultOptions :: Options
+defaultOptions = Options
+  { measurePos = True
+  }
+
 data StandardMIDI = StandardMIDI
   { tempoTrack :: RTB.T NN.Rational E.T
   , namedTracks :: [(String, RTB.T NN.Rational E.T)]
@@ -131,13 +140,15 @@ showAsMeasure = go 0 where
       then {- msr <= pos -} go (m + 1) msrs d
       else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
 
-showStandardMIDI :: StandardMIDI -> String
-showStandardMIDI m = let
+showStandardMIDI :: Options -> StandardMIDI -> String
+showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
   showLine (pos, evts) = concat
     [ "  "
-    , showAsMeasure msrs pos
+    , if measurePos opts
+      then showAsMeasure msrs pos
+      else showFraction pos
     , ": "
     , intercalate ", " (map showEvent evts)
     , ";\n"
