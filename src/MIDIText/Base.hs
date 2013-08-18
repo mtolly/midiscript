@@ -28,12 +28,12 @@ import Data.Char (toLower)
 import Data.Ord (comparing)
 
 data Options = Options
-  { measurePos :: Bool
+  { measurePosns :: Bool
   } deriving (Eq, Ord, Show, Read)
 
 defaultOptions :: Options
 defaultOptions = Options
-  { measurePos = True
+  { measurePosns = True
   }
 
 data StandardMIDI = StandardMIDI
@@ -146,7 +146,7 @@ showStandardMIDI opts m = let
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
   showLine (pos, evts) = concat
     [ "  "
-    , if measurePos opts
+    , if measurePosns opts
       then showAsMeasure msrs pos
       else showFraction pos
     , ": "

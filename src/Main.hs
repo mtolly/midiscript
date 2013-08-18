@@ -15,13 +15,27 @@ import System.Console.GetOpt
 import System.Exit (exitFailure)
 import Data.List (intercalate)
 
-options :: [OptDescr (Options -> Options)]
+data Flag
+  = BeatPosns
+  | MeasurePosns
+  | Usage
+  deriving (Eq, Ord, Show, Read)
+
+options :: [OptDescr Flag]
 options =
-  [ Option ['b'] ["beats"] (NoArg $ \o -> o { measurePos = False })
+  [ Option ['b'] ["beats"] (NoArg BeatPosns)
     "positions in beats"
-  , Option ['m'] ["measures"] (NoArg $ \o -> o { measurePos = True })
+  , Option ['m'] ["measures"] (NoArg MeasurePosns)
     "positions in measures + beats"
+  , Option ['?'] ["usage"] (NoArg Usage)
+    "print usage"
   ]
+
+applyFlags :: [Flag] -> Options -> Options
+applyFlags = foldr (.) id . map applyFlag where
+  applyFlag BeatPosns    o = o { measurePosns = False }
+  applyFlag MeasurePosns o = o { measurePosns = True }
+  applyFlag _            o = o
 
 main :: IO ()
 main = getArgs >>= \argv -> let
@@ -31,13 +45,17 @@ main = getArgs >>= \argv -> let
     _                -> ($ stdin)
   output = case files of
     _ : f : _ | f /= "-" -> withFile f WriteMode
-    _                    -> ($ stdout)
+    _                -> ($ stdout)
   in do
-    mapM_ (hPutStrLn stderr) errs
-    case files of
-      _ : _ : _ : _ -> printUsage >> exitFailure
-      _ -> input $ \h1 -> output $ \h2 ->
-        handles (foldr ($) defaultOptions flags) h1 h2
+    if not $ null errs
+      then do
+        mapM_ (hPutStrLn stderr) errs
+        printUsage
+        exitFailure
+      else if any (== Usage) flags
+        then printUsage
+        else input $ \h1 -> output $ \h2 ->
+          handles (applyFlags flags defaultOptions) h1 h2
 
 handles :: Options -> Handle -> Handle -> IO ()
 handles opts h1 h2 = do
@@ -69,4 +87,4 @@ printUsage = do
         , "Omit arguments or use - for stdin/stdout."
         , "Options:"
         ]
-  putStr $ usageInfo header options
+  hPutStr stderr $ usageInfo header options
