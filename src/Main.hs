@@ -3,7 +3,7 @@ module Main where
 import qualified Sound.MIDI.File.Load as Load
 import qualified Sound.MIDI.File.Save as Save
 import qualified Sound.MIDI.Parser.Report as Report
-import System.Environment (getArgs)
+import System.Environment (getArgs, getProgName)
 import MIDIText.Base
 import MIDIText.Scan
 import MIDIText.Parse
@@ -44,7 +44,10 @@ handles h1 h2 = do
         L.hPut h2 $ Save.toByteString $ fromStandardMIDI sm
 
 printUsage :: IO ()
-printUsage = mapM_ (hPutStrLn stderr)
-  [ "usage: miditext m2t input.mid output.txt"
-  , "       miditext t2m input.txt output.mid"
-  ]
+printUsage = do
+  n <- getProgName
+  mapM_ (hPutStrLn stderr)
+    [ "Usage: " ++ n ++ " input.mid output.txt"
+    , "       " ++ n ++ " input.txt output.mid"
+    , "Omit arguments or use - for stdin/stdout."
+    ]
