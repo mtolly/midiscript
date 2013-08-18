@@ -8,6 +8,7 @@ import MIDIText.Base
 import MIDIText.Scan
 import MIDIText.Parse
 import System.IO
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as Enc
@@ -60,7 +61,7 @@ main = getArgs >>= \argv -> let
 handles :: Options -> Handle -> Handle -> IO ()
 handles opts h1 h2 = do
   hSetBinaryMode h1 True
-  b1 <- L.hGetContents h1
+  b1 <- fmap (L.fromChunks . (: [])) $ B.hGetContents h1
   let rep = Load.maybeFromByteString b1
   case Report.result rep of
     Right mid -> case toStandardMIDI mid of
