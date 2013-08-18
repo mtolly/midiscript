@@ -13,6 +13,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as Enc
 import System.Console.GetOpt
 import System.Exit (exitFailure)
+import Data.List (intercalate)
 
 options :: [OptDescr (Options -> Options)]
 options =
@@ -62,8 +63,10 @@ handles opts h1 h2 = do
 printUsage :: IO ()
 printUsage = do
   n <- getProgName
-  mapM_ (hPutStrLn stderr)
-    [ "Usage: " ++ n ++ " input.mid output.txt"
-    , "       " ++ n ++ " input.txt output.mid"
-    , "Omit arguments or use - for stdin/stdout."
-    ]
+  let header = intercalate "\n"
+        [ "Usage: " ++ n ++ " [options] input.mid output.txt"
+        , "       " ++ n ++ " [options] input.txt output.mid"
+        , "Omit arguments or use - for stdin/stdout."
+        , "Options:"
+        ]
+  putStr $ usageInfo header options
