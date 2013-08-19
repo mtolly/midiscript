@@ -36,9 +36,9 @@ defaultOptions = Options
   { measurePosns = True
   }
 
-data StandardMIDI = StandardMIDI
-  { tempoTrack :: RTB.T NN.Rational E.T
-  , namedTracks :: [(String, RTB.T NN.Rational E.T)]
+data StandardMIDI a = StandardMIDI
+  { tempoTrack :: RTB.T NN.Rational a
+  , namedTracks :: [(String, RTB.T NN.Rational a)]
   } deriving (Eq, Ord, Show)
 
 -- | Extracts all events at position zero from the event list.
@@ -64,7 +64,7 @@ getTrackName rtb = let
     [name] -> Just (name, unviewZero notNames rtb')
     _      -> Nothing
 
-toStandardMIDI :: F.T -> Either String StandardMIDI
+toStandardMIDI :: F.T -> Either String (StandardMIDI E.T)
 toStandardMIDI (F.Cons F.Parallel (F.Ticks res) trks) = let
   trks' = map (RTB.mapTime (\tks -> fromIntegral tks / fromIntegral res)) trks
   named = map getTrackName $ drop 1 trks'
@@ -77,7 +77,7 @@ toStandardMIDI (F.Cons F.Parallel (F.Ticks res) trks) = let
       "Tracks without names (0 is tempo track): " ++ show unnamedIndexes
 toStandardMIDI _ = Left "Not a type-1 (parallel) ticks-based MIDI"
 
-fromStandardMIDI :: StandardMIDI -> F.T
+fromStandardMIDI :: (StandardMIDI E.T) -> F.T
 fromStandardMIDI sm = let
   withNames = flip map (namedTracks sm) $ \(s, rtb) ->
     RTB.cons 0 (E.MetaEvent (M.TrackName s)) rtb
@@ -140,7 +140,7 @@ showAsMeasure = go 0 where
       then {- msr <= pos -} go (m + 1) msrs d
       else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
 
-showStandardMIDI :: Options -> StandardMIDI -> String
+showStandardMIDI :: Options -> (StandardMIDI E.T) -> String
 showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"

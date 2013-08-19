@@ -224,7 +224,7 @@ data Position
   deriving (Eq, Ord, Show, Read)
 
 listsToMIDI
-  :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI
+  :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI E.T
 listsToMIDI tmp named = let
   toRTB = RTB.flatten . RTB.fromAbsoluteEventList . ATB.fromPairList
     . sortBy (comparing fst) . map (first posToRat)
