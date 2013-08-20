@@ -17,7 +17,6 @@ import MIDIText.Base
 import Control.Arrow (first, second)
 import Data.List (sortBy)
 import Data.Ord (comparing)
-import Data.Maybe (mapMaybe)
 
 }
 
@@ -77,8 +76,9 @@ import Data.Maybe (mapMaybe)
 %%
 
 File
-  : MIDITracks { listsToMIDI [] $ map (second shim) $1 }
-  | MIDITracks TempoTrack MIDITracks { listsToMIDI (shim $2) $ map (second shim) $ $1 ++ $3 }
+  : MIDITracks { listsToMIDI [] $ map (second flattenExtra) $1 }
+  | MIDITracks TempoTrack MIDITracks
+    { listsToMIDI (flattenExtra $2) $ map (second flattenExtra) $ $1 ++ $3 }
 
 TempoTrack
   : tempo '{' MIDIEventLinesCh '}' { $3 (C.toChannel 0) }
@@ -235,9 +235,6 @@ data Position
   | Measures Int Rational
   deriving (Eq, Ord, Show, Read)
 
-shim :: [(Position, [Extra])] -> [(Position, [E.T])]
-shim = map (second (: [])) . flattenExtra
-
 flattenExtra :: [(Position, [Extra])] -> [(Position, E.T)]
 flattenExtra = concatMap $ \(pos, exs) -> let
   addToPos rat = case pos of
@@ -254,9 +251,9 @@ flattenExtra' = concatMap $ \(rat, exs) -> let
     Subtrack sub -> map (first (+ rat)) $ flattenExtra' sub
 
 listsToMIDI
-  :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI E.T
+  :: [(Position, E.T)] -> [(String, [(Position, E.T)])] -> StandardMIDI E.T
 listsToMIDI tmp named = let
-  toRTB = RTB.flatten . RTB.fromAbsoluteEventList . ATB.fromPairList
+  toRTB = RTB.fromAbsoluteEventList . ATB.fromPairList
     . sortBy (comparing fst) . map (first posToRat)
   msrs = readTempoTrack tmp
   posToRat pos = case pos of
@@ -265,9 +262,9 @@ listsToMIDI tmp named = let
   namedRTBs = map (second toRTB) named
   in StandardMIDI (toRTB tmp) namedRTBs
 
-readTempoTrack :: [(Position, [E.T])] -> [NN.Rational]
+readTempoTrack :: [(Position, E.T)] -> [NN.Rational]
 readTempoTrack evts = let
-  sigs = [ (pos, s) | (pos, es) <- evts, s <- mapMaybe getTimeSig es ]
+  sigs = [ (pos, s) | (pos, e) <- evts, Just s <- [getTimeSig e] ]
   msrList = go 0 0 4
   go :: Int -> Rational -> NN.Rational -> [NN.Rational]
   go msr pos sig = let
