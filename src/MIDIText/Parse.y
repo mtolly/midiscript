@@ -77,8 +77,8 @@ import Data.Maybe (mapMaybe)
 %%
 
 File
-  : MIDITracks { listsToMIDI [] $1 }
-  | MIDITracks TempoTrack MIDITracks { listsToMIDI $2 ($1 ++ $3) }
+  : MIDITracks { listsToMIDI [] $ map (second shim) $1 }
+  | MIDITracks TempoTrack MIDITracks { listsToMIDI (shim $2) $ map (second shim) $ $1 ++ $3 }
 
 TempoTrack
   : tempo '{' MIDIEventLinesCh '}' { $3 (C.toChannel 0) }
@@ -108,8 +108,25 @@ MIDIEventsCh
   | MIDIEventCh ',' MIDIEventsCh { \ch -> $1 ch : $3 ch }
 
 MIDIEventCh
-  : MIDIEvent { \_ch -> $1 }
-  | MIDIBody { \ch -> E.MIDIEvent $ C.Cons ch $1 }
+  : MIDIEvent { \_ch -> Event $1 }
+  | MIDIBody { \ch -> Event $ E.MIDIEvent $ C.Cons ch $1 }
+  | '{' SubEventLinesCh '}' { \ch -> Subtrack ($2 ch) }
+
+SubEventLinesCh
+  : { \_ch -> [] }
+  | SubEventLineCh SubEventLinesCh { \ch -> $1 ch : $2 ch }
+
+SubEventLineCh
+  : Rat ':' SubEventsCh ';' { \ch -> ($1, $3 ch) }
+
+SubEventsCh
+  : SubEventCh { \ch -> [$1 ch] }
+  | SubEventCh ',' SubEventsCh { \ch -> $1 ch : $3 ch }
+
+SubEventCh
+  : MIDIEvent { \_ch -> Event $1 }
+  | MIDIBody { \ch -> Event $ E.MIDIEvent $ C.Cons ch $1 }
+  | '{' SubEventLinesCh '}' { \ch -> Subtrack ($2 ch) }
 
 MIDIEvent
   : seq Int { E.MetaEvent $ M.SequenceNum $2 }
@@ -217,6 +234,9 @@ data Position
   = Absolute Rational
   | Measures Int Rational
   deriving (Eq, Ord, Show, Read)
+
+shim :: [(Position, [Extra])] -> [(Position, [E.T])]
+shim = map (second (: [])) . flattenExtra
 
 flattenExtra :: [(Position, [Extra])] -> [(Position, E.T)]
 flattenExtra = concatMap $ \(pos, exs) -> let
