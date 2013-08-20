@@ -208,10 +208,30 @@ Rat1
 parseError :: [S.Token] -> a
 parseError _ = error "Parse error"
 
+data Extra
+  = Event E.T
+  | Subtrack [(Rational, [Extra])]
+  deriving (Eq, Ord, Show)
+
 data Position
   = Absolute Rational
   | Measures Int Rational
   deriving (Eq, Ord, Show, Read)
+
+flattenExtra :: [(Position, [Extra])] -> [(Position, E.T)]
+flattenExtra = concatMap $ \(pos, exs) -> let
+  addToPos rat = case pos of
+    Absolute r -> Absolute $ r + rat
+    Measures m r -> Measures m $ r + rat
+  in flip concatMap exs $ \ex -> case ex of
+    Event e -> [(pos, e)]
+    Subtrack sub -> map (first addToPos) $ flattenExtra' sub
+
+flattenExtra' :: [(Rational, [Extra])] -> [(Rational, E.T)]
+flattenExtra' = concatMap $ \(rat, exs) -> let
+  in flip concatMap exs $ \ex -> case ex of
+    Event e -> [(rat, e)]
+    Subtrack sub -> map (first (+ rat)) $ flattenExtra' sub
 
 listsToMIDI
   :: [(Position, [E.T])] -> [(String, [(Position, [E.T])])] -> StandardMIDI E.T
