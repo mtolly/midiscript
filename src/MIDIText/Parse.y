@@ -81,30 +81,20 @@ File
   | MIDITracks TempoTrack MIDITracks { listsToMIDI $2 ($1 ++ $3) }
 
 TempoTrack
-  : tempo '{' MIDIEventLines '}' { $3 }
+  : tempo '{' MIDIEventLinesCh '}' { $3 (C.toChannel 0) }
+  | tempo ch Int '{' MIDIEventLinesCh '}' { $5 (C.toChannel $3) }
 
 MIDITracks
   : { [] }
   | MIDITrack MIDITracks { $1 : $2 }
 
 MIDITrack
-  : str '{' MIDIEventLines '}' { ($1, $3) }
+  : str '{' MIDIEventLinesCh '}' { ($1, $3 (C.toChannel 0)) }
   | str ch Int '{' MIDIEventLinesCh '}' { ($1, $5 (C.toChannel $3)) }
-
-MIDIEventLines
-  : { [] }
-  | MIDIEventLine MIDIEventLines { $1 : $2 }
-
-MIDIEventLine
-  : Position ':' MIDIEvents ';' { ($1, $3) }
 
 Position
   : Rat { Absolute $1 }
   | Int '|' Rat { Measures $1 $3 }
-
-MIDIEvents
-  : MIDIEvent { [$1] }
-  | MIDIEvent ',' MIDIEvents { $1 : $3 }
 
 MIDIEventLinesCh
   : { \_ch -> [] }
