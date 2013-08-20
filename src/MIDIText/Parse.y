@@ -161,7 +161,7 @@ Tempo
 -- Parses the numerator and denominator of a time signature.
 TimeSig
   : Int ',' Int { ($1, $3) }
-  | Int '|' Int { ($1, round $ log (fromIntegral $3) / log 2) }
+  | Int ':' Int { ($1, round $ log (fromIntegral $3) / log 2) }
 
 -- Parses the # of MIDI clocks in a quarter note,
 -- and the number of 32nd notes in a quarter note.

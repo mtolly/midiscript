@@ -180,7 +180,7 @@ showEvent evt = unwords $ case evt of
     M.SMPTEOffset h m s f b -> ["smpte", listParens $ map show [h, m, s, f, b]]
     M.TimeSig a b c d -> "time" : let
       rest = guard ((c, d) /= (24, 8)) >> [show c, show d]
-      nd = unwords [show a, "|", show $ (2 :: Integer) ^ b]
+      nd = unwords [show a, ":", show $ (2 :: Integer) ^ b]
       in [listParens $ nd : rest]
     M.KeySig (Key.Cons mode (Key.Accidentals n)) ->
       ["key", map toLower $ show mode, show n]
