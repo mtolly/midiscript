@@ -98,10 +98,11 @@ Position
 
 MIDIEventLinesCh
   : { \_ch -> [] }
-  | MIDIEventLineCh MIDIEventLinesCh { \ch -> $1 ch : $2 ch }
+  | MIDIEventLineCh { \ch -> [$1 ch] }
+  | MIDIEventLineCh ';' MIDIEventLinesCh { \ch -> $1 ch : $3 ch }
 
 MIDIEventLineCh
-  : Position ':' MIDIEventsCh ';' { \ch -> ($1, $3 ch) }
+  : Position ':' MIDIEventsCh { \ch -> ($1, $3 ch) }
 
 MIDIEventsCh
   : MIDIEventCh { \ch -> [$1 ch] }
@@ -114,10 +115,11 @@ MIDIEventCh
 
 SubEventLinesCh
   : { \_ch -> [] }
-  | SubEventLineCh SubEventLinesCh { \ch -> $1 ch : $2 ch }
+  | SubEventLineCh { \ch -> [$1 ch] }
+  | SubEventLineCh ';' SubEventLinesCh { \ch -> $1 ch : $3 ch }
 
 SubEventLineCh
-  : Rat ':' SubEventsCh ';' { \ch -> ($1, $3 ch) }
+  : Rat ':' SubEventsCh { \ch -> ($1, $3 ch) }
 
 SubEventsCh
   : SubEventCh { \ch -> [$1 ch] }
