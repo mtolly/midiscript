@@ -1,4 +1,5 @@
 {
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
 module MIDIText.Parse (parse) where
 
@@ -177,7 +178,7 @@ Tempo
 -- Parses the numerator and denominator of a time signature.
 TimeSig
   : Int ',' Int { ($1, $3) }
-  | Int ':' Int { ($1, round $ log (fromIntegral $3) / log 2) }
+  | Int ':' Int { ($1, log2 $3) }
 
 -- Parses the # of MIDI clocks in a quarter note,
 -- and the number of 32nd notes in a quarter note.
@@ -307,5 +308,12 @@ readTempoTrack evts = let
       []         -> sig
     in newSig : go (msr + 1) (pos + NN.toNumber newSig) newSig
   in msrList
+
+log2 :: Int -> Int
+log2 target = go 0 1 where
+  go !pow !at = case compare at target of
+    EQ -> pow
+    LT -> go (pow + 1) (at * 2)
+    GT -> error $ "log2: not a power of two: " ++ show target
 
 }
