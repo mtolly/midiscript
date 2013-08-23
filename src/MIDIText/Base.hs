@@ -26,6 +26,8 @@ import Control.Monad (guard)
 import Data.List (sort, sortBy, intercalate)
 import Data.Char (toLower)
 import Data.Ord (comparing)
+import Data.Word (Word8)
+import Numeric (showHex)
 
 data Options = Options
   { measurePosns :: Bool
@@ -118,7 +120,7 @@ makeMeasures = go 4 where
         sig : _ -> sig
       in newSig : go newSig (dropTime newSig rtb)
 
--- | Shows a number in the form @a+(b/c)@, or just @a@ if the number is whole.
+-- | Shows a number in one of @a@, @a.b@, or @a+(b/c)@.
 showFraction :: NN.Rational -> String
 showFraction rat = let
   (whole, part) = properFraction $ NN.toNumber rat
@@ -126,7 +128,7 @@ showFraction rat = let
   in if part == 0
     then show (whole :: Integer)
     else concat $ case quotRem 100 denom of
-      (q, 0) -> let
+      (q, 0) -> let -- show decimal if 2 or less places
         rdrop0 = reverse . dropWhile (== '0') . reverse
         hundredths = num * q
         in [show whole, ".", rdrop0 $ show hundredths]
@@ -163,10 +165,17 @@ standardTrack :: RTB.T NN.Rational E.T -> [(NN.Rational, [E.T])]
 standardTrack = ATB.toPairList . RTB.toAbsoluteEventList 0
   . fmap sort . RTB.collectCoincident
 
+showBytes :: [Word8] -> String
+showBytes ws = "(" ++ intercalate ", " (map showByte ws) ++ ")"
+  where showByte w = "0x" ++ case showHex w "" of
+          ""  -> "00"
+          [c] -> ['0', c]
+          hex -> hex
+
 showEvent :: E.T -> String
 showEvent evt = unwords $ case evt of
   E.MetaEvent meta -> case meta of
-    M.SequenceNum i -> ["seq", show i]
+    M.SequenceNum i -> ["seqnum", show i]
     M.TextEvent s -> ["text", show s]
     M.Copyright s -> ["copy", show s]
     M.TrackName s -> ["name", show s]
@@ -184,8 +193,8 @@ showEvent evt = unwords $ case evt of
       in [listParens $ nd : rest]
     M.KeySig (Key.Cons mode (Key.Accidentals n)) ->
       ["key", map toLower $ show mode, show n]
-    M.SequencerSpecific _bytes -> undefined
-    M.Unknown _n _bytes -> undefined
+    M.SequencerSpecific bytes -> ["seq", showBytes bytes]
+    M.Unknown n bytes -> ["meta", show n, showBytes bytes]
     where listParens xs = "(" ++ intercalate ", " xs ++ ")"
   E.MIDIEvent (C.Cons ch body) -> let
     showChannel = case C.fromChannel ch of
@@ -211,5 +220,5 @@ showEvent evt = unwords $ case evt of
         Mode.MonoMode i -> ["mono", show i]
         Mode.PolyMode -> ["poly"]
   E.SystemExclusive ex -> case ex of
-    SysEx.Regular _bytes -> undefined
-    SysEx.Escape _bytes -> undefined
+    SysEx.Regular bytes -> ["sysex", showBytes bytes]
+    SysEx.Escape bytes -> ["escape", showBytes bytes]

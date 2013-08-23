@@ -5,6 +5,7 @@ module MIDIText.Parse (parse) where
 import qualified MIDIText.Scan as S
 import qualified Sound.MIDI.File.Event as E
 import qualified Sound.MIDI.File.Event.Meta as M
+import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
 import qualified Sound.MIDI.Message.Channel as C
 import qualified Sound.MIDI.Message.Channel.Voice as V
 import qualified Sound.MIDI.Message.Channel.Mode as Mode
@@ -17,6 +18,7 @@ import MIDIText.Base
 import Control.Arrow (first, second)
 import Data.List (sortBy)
 import Data.Ord (comparing)
+import Data.Word (Word8)
 
 }
 
@@ -40,7 +42,7 @@ import Data.Ord (comparing)
   '}' { S.RBrace }
   '|' { S.Pipe }
   bool { S.Bool $$ }
-  seq { S.SequenceNum }
+  seqnum { S.SequenceNum }
   text { S.TextEvent }
   copy { S.Copyright }
   name { S.TrackName }
@@ -72,6 +74,10 @@ import Data.Ord (comparing)
   mono { S.MonoMode }
   poly { S.PolyMode }
   bpm { S.BPM }
+  seq { S.Sequencer }
+  meta { S.Meta }
+  sysex { S.SysEx }
+  escape { S.Escape }
 
 %%
 
@@ -131,7 +137,9 @@ SubEventCh
   | '{' SubEventLinesCh '}' { \ch -> Subtrack ($2 ch) }
 
 MIDIEvent
-  : seq Int { E.MetaEvent $ M.SequenceNum $2 }
+  : ch Int MIDIBody
+    { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
+  | seqnum Int { E.MetaEvent $ M.SequenceNum $2 }
   | text str { E.MetaEvent $ M.TextEvent $2 }
   | copy str { E.MetaEvent $ M.Copyright $2 }
   | name str { E.MetaEvent $ M.TrackName $2 }
@@ -149,8 +157,14 @@ MIDIEvent
     { E.MetaEvent $ M.TimeSig (fst $3) (snd $3) (fst $4) (snd $4) }
   | key Mode Int
     { E.MetaEvent $ M.KeySig $ Key.Cons $2 $ Key.Accidentals $3 }
-  | ch Int MIDIBody
-    { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
+  | seq '(' W8List ')'
+    { E.MetaEvent $ M.SequencerSpecific $3 }
+  | meta Int '(' W8List ')'
+    { E.MetaEvent $ M.Unknown $2 $4 }
+  | sysex '(' W8List ')'
+    { E.SystemExclusive $ SysEx.Regular $3 }
+  | escape '(' W8List ')'
+    { E.SystemExclusive $ SysEx.Escape $3 }
 
 Tempo
   : Int { M.toTempo $1 }
@@ -206,6 +220,14 @@ MIDIMode
 
 Int
   : Rat { floor $1 :: Int }
+
+W8
+  : Int { fromIntegral $1 :: Word8 }
+
+W8List
+  : { [] }
+  | W8 { [$1] }
+  | W8 ',' W8List { $1 : $3 }
 
 Rat
   : Rat '*' Rat0 { $1 * $3 }

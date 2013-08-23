@@ -25,6 +25,7 @@ $white+ ;
   partRat = fromInteger (read part) / partDenom
   in Token $ Rat $ wholeRat + partRat
   }
+0x [0-9A-Fa-f]+ { Token . Rat . fromInteger . read }
 
 "+" { const $ Token Plus }
 "-" { const $ Token Dash }
@@ -94,13 +95,17 @@ data Token
   | MonoMode
   | PolyMode
   | BPM
+  | Sequencer
+  | Meta
+  | SysEx
+  | Escape
   deriving (Eq, Ord, Show, Read)
 
 identify :: Token' -> Token
 identify (Ident i) = case map toLower i of
   "true" -> Bool True
   "false" -> Bool False
-  "seq" -> SequenceNum
+  "seqnum" -> SequenceNum
   "text" -> TextEvent
   "copy" -> Copyright
   "name" -> TrackName
@@ -132,6 +137,10 @@ identify (Ident i) = case map toLower i of
   "mono" -> MonoMode
   "poly" -> PolyMode
   "bpm" -> BPM
+  "seq" -> Sequencer
+  "meta" -> Meta
+  "sysex" -> SysEx
+  "escape" -> Escape
   _ -> error $ "scan: unrecognized bare word " ++ show i
 identify (Token tok) = tok
 
