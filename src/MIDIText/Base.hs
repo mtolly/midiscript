@@ -157,8 +157,8 @@ showStandardMIDI opts m = let
     ]
   sortedTracks = sortBy (comparing fst) $ namedTracks m
   allTracks = ("tempo", tempoTrack m) : named
-  named = map (first $ \n -> unwords [show n, "ch", "0"]) sortedTracks
-  in concatMap (\(n, t) -> n ++ " " ++ showTrack t ++ "\n\n") allTracks
+  named = map (first show) sortedTracks
+  in concatMap (\(n, t) -> n ++ " ch 0 " ++ showTrack t ++ "\n\n") allTracks
 
 -- | Groups events by absolute time, and sorts concurrent events.
 standardTrack :: RTB.T NN.Rational E.T -> [(NN.Rational, [E.T])]

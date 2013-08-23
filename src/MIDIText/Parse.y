@@ -196,8 +196,12 @@ MIDIBody
 MIDIVoice
   : on Int v Int
     { V.NoteOn (V.toPitch $2) (V.toVelocity $4) }
+  | on Int
+    { V.NoteOn (V.toPitch $2) (V.toVelocity 96) }
   | off Int v Int
     { V.NoteOff (V.toPitch $2) (V.toVelocity $4) }
+  | off Int
+    { V.NoteOff (V.toPitch $2) (V.toVelocity 0) }
   | after Int v Int
     { V.PolyAftertouch (V.toPitch $2) $4 }
   | pc Int
