@@ -3,6 +3,7 @@
 module MIDIText.Scan (scan, Token(..)) where
 
 import Data.Char (toLower, isDigit)
+import Data.Maybe (fromJust)
 
 }
 
@@ -26,6 +27,16 @@ $white+ ;
   in Token $ Rat $ wholeRat + partRat
   }
 0x [0-9A-Fa-f]+ { Token . Rat . fromInteger . read }
+[CDEFGABcdefgab] ([IiEe] [Ss])? [0-9]+
+  { \s -> Token $ Rat $ fromInteger $ case map toLower s of
+    k : s' -> let
+      (mod, octave) = case s' of
+        'i' : 's' : oct -> (1, read oct)
+        'e' : 's' : oct -> (-1, read oct)
+        oct -> (0, read oct)
+      key = fromJust $ lookup k $ zip "cdefgab" [0, 2, 4, 5, 7, 9, 11]
+      in octave * 12 + key + mod
+  }
 
 "+" { const $ Token Plus }
 "-" { const $ Token Dash }
