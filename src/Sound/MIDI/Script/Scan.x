@@ -75,7 +75,6 @@ data Token
   | LBrace
   | RBrace
   | Pipe
-  | Bool Bool
   | SequenceNum
   | TextEvent
   | Copyright
@@ -116,8 +115,8 @@ data Token
 
 identify :: Token' -> Token
 identify (Ident i) = case map toLower i of
-  "true" -> Bool True
-  "false" -> Bool False
+  "true" -> Rat 1
+  "false" -> Rat 0
   "seqnum" -> SequenceNum
   "text" -> TextEvent
   "copy" -> Copyright

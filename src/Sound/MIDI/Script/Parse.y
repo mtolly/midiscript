@@ -42,7 +42,6 @@ import Data.Word (Word8)
   '{' { S.LBrace }
   '}' { S.RBrace }
   '|' { S.Pipe }
-  bool { S.Bool $$ }
   seqnum { S.SequenceNum }
   text { S.TextEvent }
   copy { S.Copyright }
@@ -217,9 +216,9 @@ MIDIVoice
 MIDIMode
   : soundoff { Mode.AllSoundOff }
   | reset { Mode.ResetAllControllers }
-  | local bool { Mode.LocalControl $2 }
+  | local Bool { Mode.LocalControl $2 }
   | notesoff { Mode.AllNotesOff }
-  | omni bool { Mode.OmniMode $2 }
+  | omni Bool { Mode.OmniMode $2 }
   | mono Int { Mode.MonoMode $2 }
   | poly { Mode.PolyMode }
 
@@ -233,6 +232,9 @@ W8List
   : { [] }
   | W8 { [$1] }
   | W8 ',' W8List { $1 : $3 }
+
+Bool
+  : Rat { $1 /= 0 }
 
 Rat
   : Rat '*' Rat0 { $1 * $3 }
