@@ -17,7 +17,7 @@ import qualified Data.EventList.Absolute.TimeBody as ATB
 import qualified Numeric.NonNegative.Wrapper as NN
 import MIDIText.Base
 import Control.Arrow (first, second)
-import Data.List (sortBy)
+import Data.List (sortBy, groupBy)
 import Data.Ord (comparing)
 import Data.Word (Word8)
 
@@ -289,7 +289,10 @@ listsToMIDI tmp named = let
     Absolute r -> NN.fromNumber r
     Measures m r -> sum (take m msrs) + NN.fromNumber r
   namedRTBs = map (second toRTB) named
-  in StandardMIDI (toRTB tmp) namedRTBs
+  mergeSame ps = (fst $ head ps, foldr RTB.merge RTB.empty $ map snd ps)
+  mergeNames = map mergeSame . groupBy (equating fst) . sortBy (comparing fst)
+  equating f x y = f x == f y
+  in StandardMIDI (toRTB tmp) $ mergeNames namedRTBs
 
 readTempoTrack :: [(Position, E.T)] -> [NN.Rational]
 readTempoTrack evts = let
