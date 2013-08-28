@@ -4,6 +4,7 @@ module MIDIText.Scan (scan, Token(..)) where
 
 import Data.Char (toLower, isDigit)
 import Data.Maybe (fromJust)
+import Control.Arrow (first)
 
 }
 
@@ -27,13 +28,14 @@ $white+ ;
   in Token $ Rat $ wholeRat + partRat
   }
 0x [0-9A-Fa-f]+ { Token . Rat . fromInteger . read }
-[CDEFGABcdefgab] ([IiEe] [Ss])? [0-9]+
+[CDEFGABcdefgab] ([IiEe] [Ss])* [0-9]+
   { \s -> Token $ Rat $ fromInteger $ case map toLower s of
     k : s' -> let
-      (mod, octave) = case s' of
-        'i' : 's' : oct -> (1, read oct)
-        'e' : 's' : oct -> (-1, read oct)
+      readSuffix sfx = case sfx of
+        'i' : 's' : sfx' -> first (+ 1) $ readSuffix sfx'
+        'e' : 's' : sfx' -> first (subtract 1) $ readSuffix sfx'
         oct -> (0, read oct)
+      (mod, octave) = readSuffix s'
       key = fromJust $ lookup k $ zip "cdefgab" [0, 2, 4, 5, 7, 9, 11]
       in octave * 12 + key + mod
   }
