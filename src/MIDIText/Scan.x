@@ -23,7 +23,7 @@ $white+ ;
 [0-9]+ "." [0-9]+ { \s -> let
   (whole, '.' : part) = span isDigit s
   wholeRat = fromInteger $ read whole
-  partDenom = fromInteger $ read $ '1' : map (const '0') part
+  partDenom = fromInteger $ 10 ^ length part
   partRat = fromInteger (read part) / partDenom
   in Token $ Rat $ wholeRat + partRat
   }
