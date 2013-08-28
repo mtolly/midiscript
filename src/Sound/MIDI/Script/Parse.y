@@ -1,9 +1,9 @@
 {
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
-module MIDIText.Parse (parse) where
+module Sound.MIDI.Script.Parse (parse) where
 
-import qualified MIDIText.Scan as S
+import qualified Sound.MIDI.Script.Scan as S
 import qualified Sound.MIDI.File.Event as E
 import qualified Sound.MIDI.File.Event.Meta as M
 import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
@@ -15,7 +15,7 @@ import qualified Sound.MIDI.KeySignature as Key
 import qualified Data.EventList.Relative.TimeBody as RTB
 import qualified Data.EventList.Absolute.TimeBody as ATB
 import qualified Numeric.NonNegative.Wrapper as NN
-import MIDIText.Base
+import Sound.MIDI.Script.Base
 import Control.Arrow (first, second)
 import Data.List (sortBy, groupBy)
 import Data.Ord (comparing)

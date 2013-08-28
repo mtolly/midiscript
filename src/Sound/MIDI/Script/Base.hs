@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 {-# LANGUAGE BangPatterns #-}
-module MIDIText.Base where
+module Sound.MIDI.Script.Base where
 
 import qualified Sound.MIDI.File as F
 import qualified Sound.MIDI.File.Event as E

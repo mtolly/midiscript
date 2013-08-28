@@ -1,6 +1,6 @@
 {
 {-# OPTIONS_GHC -w #-}
-module MIDIText.Scan (scan, Token(..)) where
+module Sound.MIDI.Script.Scan (scan, Token(..)) where
 
 import Data.Char (toLower, isDigit)
 import Data.Maybe (fromJust)

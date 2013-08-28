@@ -4,9 +4,9 @@ import qualified Sound.MIDI.File.Load as Load
 import qualified Sound.MIDI.File.Save as Save
 import qualified Sound.MIDI.Parser.Report as Report
 import System.Environment (getArgs, getProgName)
-import MIDIText.Base
-import MIDIText.Scan
-import MIDIText.Parse
+import Sound.MIDI.Script.Base
+import Sound.MIDI.Script.Scan
+import Sound.MIDI.Script.Parse
 import System.IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
