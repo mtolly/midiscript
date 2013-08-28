@@ -31,11 +31,13 @@ import Numeric (showHex)
 
 data Options = Options
   { measurePosns :: Bool
+  , resolution :: Integer
   } deriving (Eq, Ord, Show, Read)
 
 defaultOptions :: Options
 defaultOptions = Options
   { measurePosns = True
+  , resolution = 480
   }
 
 data StandardMIDI a = StandardMIDI
@@ -79,14 +81,14 @@ toStandardMIDI (F.Cons F.Parallel (F.Ticks res) trks) = let
       "Tracks without names (0 is tempo track): " ++ show unnamedIndexes
 toStandardMIDI _ = Left "Not a type-1 (parallel) ticks-based MIDI"
 
-fromStandardMIDI :: (StandardMIDI E.T) -> F.T
-fromStandardMIDI sm = let
+fromStandardMIDI :: Options -> StandardMIDI E.T -> F.T
+fromStandardMIDI opts sm = let
   withNames = flip map (namedTracks sm) $ \(s, rtb) ->
     RTB.cons 0 (E.MetaEvent (M.TrackName s)) rtb
   allBeats = tempoTrack sm : withNames
   denoms = flip concatMap allBeats $
     map (denominator . NN.toNumber . fst) . RTB.toPairList
-  res = fromIntegral $ foldr lcm 192 denoms :: NN.Int
+  res = fromIntegral $ foldr lcm (resolution opts) denoms :: NN.Int
   res' = fromIntegral res :: NN.Rational
   allTicks = flip map allBeats $ RTB.mapTime $ \dt -> floor $ dt * res'
   in F.Cons F.Parallel (F.Ticks res) allTicks

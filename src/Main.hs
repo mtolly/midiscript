@@ -20,6 +20,7 @@ data Flag
   = BeatPosns
   | MeasurePosns
   | Usage
+  | Resolution Integer
   deriving (Eq, Ord, Show, Read)
 
 options :: [OptDescr Flag]
@@ -28,15 +29,18 @@ options =
     "positions in beats"
   , Option ['m'] ["measures"] (NoArg MeasurePosns)
     "positions in measures + beats"
+  , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
+    "minimum resolution for MIDI output"
   , Option ['?'] ["usage"] (NoArg Usage)
     "print usage"
   ]
 
 applyFlags :: [Flag] -> Options -> Options
 applyFlags = foldr (.) id . map applyFlag where
-  applyFlag BeatPosns    o = o { measurePosns = False }
-  applyFlag MeasurePosns o = o { measurePosns = True }
-  applyFlag _            o = o
+  applyFlag BeatPosns      o = o { measurePosns = False }
+  applyFlag MeasurePosns   o = o { measurePosns = True  }
+  applyFlag (Resolution r) o = o { resolution   = r     }
+  applyFlag _              o = o
 
 main :: IO ()
 main = getArgs >>= \argv -> let
@@ -77,7 +81,7 @@ handles opts h1 h2 = do
       sm = parse $ scan s1
       in do
         hSetBinaryMode h2 True
-        L.hPut h2 $ Save.toByteString $ fromStandardMIDI sm
+        L.hPut h2 $ Save.toByteString $ fromStandardMIDI opts sm
 
 printUsage :: IO ()
 printUsage = do

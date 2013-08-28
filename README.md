@@ -28,8 +28,9 @@ stdout, supply `-` for the filename, or just elide arguments.
 
 Options:
 
-    -b : for mid -> txt, positions are written as beats
-    -m : for mid -> txt, positions are written as measures|beats (default)
+    -b     : for mid -> txt, positions are written as beats
+    -m     : for mid -> txt, positions are written as measures|beats (default)
+    -r INT : for txt -> mid, minimum resolution of output file (default 480)
 
 Note that both measures and beats are 0-based, not 1-based. So the first beat of
 the song is `0|0`.
