@@ -36,7 +36,7 @@ data Options = Options
 
 defaultOptions :: Options
 defaultOptions = Options
-  { measurePosns = True
+  { measurePosns = False
   , resolution = 480
   }
 
