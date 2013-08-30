@@ -120,7 +120,7 @@ isMeasureBeats n = case n of
   Sub x y -> do
     (m, b1) <- isMeasureBeats x
     b2      <- isRational y
-    return (m, b1 + b2)
+    return (m, b1 - b2)
   _ -> do
     b <- isRational n
     return (0, b)
