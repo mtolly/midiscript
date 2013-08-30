@@ -1,9 +1,21 @@
 {
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
-module Sound.MIDI.Script.Parse (parse) where
+module Sound.MIDI.Script.Parse
+( parse
+, File(..)
+, Track(..)
+, Number(..)
+, Event(..)
+, Event'(..)
+, Meta(..)
+, SysEx(..)
+, MIDI(..)
+, Mode(..)
+) where
 
 import qualified Sound.MIDI.Script.Scan as S
+{-
 import qualified Sound.MIDI.File.Event as E
 import qualified Sound.MIDI.File.Event.Meta as M
 import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
@@ -15,11 +27,11 @@ import qualified Sound.MIDI.KeySignature as Key
 import qualified Data.EventList.Relative.TimeBody as RTB
 import qualified Data.EventList.Absolute.TimeBody as ATB
 import qualified Numeric.NonNegative.Wrapper as NN
-import Sound.MIDI.Script.Base
 import Control.Arrow (first, second)
 import Data.List (sortBy, groupBy)
 import Data.Ord (comparing)
 import Data.Word (Word8)
+-}
 
 }
 
@@ -30,6 +42,7 @@ import Data.Word (Word8)
 %token
   str { S.Str $$ }
   rat { S.Rat $$ }
+  tone { S.Tone $$ }
   '+' { S.Plus }
   '-' { S.Dash }
   '*' { S.Star }
@@ -78,247 +91,242 @@ import Data.Word (Word8)
   meta { S.Meta }
   sysex { S.SysEx }
   escape { S.Escape }
+  s { S.Seconds }
 
 %%
 
 File
-  : MIDITracks { listsToMIDI [] $ map (second flattenExtra) $1 }
-  | MIDITracks TempoTrack MIDITracks
-    { listsToMIDI (flattenExtra $2) $ map (second flattenExtra) $ $1 ++ $3 }
-
-TempoTrack
-  : tempo '{' MIDIEventLinesCh '}' { $3 (C.toChannel 0) }
-  | tempo ch Int '{' MIDIEventLinesCh '}' { $5 (C.toChannel $3) }
-
-MIDITracks
   : { [] }
-  | MIDITrack MIDITracks { $1 : $2 }
+  | TopTrack File { $1 : $2 }
 
-MIDITrack
-  : str '{' MIDIEventLinesCh '}' { ($1, $3 (C.toChannel 0)) }
-  | str ch Int '{' MIDIEventLinesCh '}' { ($1, $5 (C.toChannel $3)) }
+TopTrack
+  : tempo Track { (Nothing, $2) }
+  | str Track { (Just $1, $2) }
 
-Position
-  : Rat { Absolute $1 }
-  | Int '|' Rat { Measures $1 $3 }
+Track
+  : ch Num '{' TrackEvents '}' { Track (Just $2) $4 }
+  | '{' TrackEvents '}' { Track Nothing $2 }
 
-MIDIEventLinesCh
-  : { \_ch -> [] }
-  | MIDIEventLineCh { \ch -> [$1 ch] }
-  | MIDIEventLineCh ';' MIDIEventLinesCh { \ch -> $1 ch : $3 ch }
+TrackEvents
+  : { [] }
+  | TrackEvent { [$1] }
+  | TrackEvent ';' TrackEvents { $1 : $3 }
 
-MIDIEventLineCh
-  : Position ':' MIDIEventsCh { \ch -> ($1, $3 ch) }
+TrackEvent
+  : Num ':' Events { ($1, $3) }
 
-MIDIEventsCh
-  : MIDIEventCh { \ch -> [$1 ch] }
-  | MIDIEventCh ',' MIDIEventsCh { \ch -> $1 ch : $3 ch }
+Events
+  : { [] }
+  | Event { [$1] }
+  | Event ',' Events { $1 : $3 }
 
-MIDIEventCh
-  : MIDIEvent { \_ch -> Event $1 }
-  | MIDIBody { \ch -> Event $ E.MIDIEvent $ C.Cons ch $1 }
-  | '{' SubEventLinesCh '}' { \ch -> Subtrack ($2 ch) }
+Event
+  : Track { Subtrack $1 }
+  | Meta { Event $ Meta $1 }
+  | ch Num MIDI { Event $ MIDI (Just $2) $3 }
+  | MIDI { Event $ MIDI Nothing $1 }
+  | SysEx { Event $ SysEx $1 }
 
-SubEventLinesCh
-  : { \_ch -> [] }
-  | SubEventLineCh { \ch -> [$1 ch] }
-  | SubEventLineCh ';' SubEventLinesCh { \ch -> $1 ch : $3 ch }
-
-SubEventLineCh
-  : Rat ':' SubEventsCh { \ch -> ($1, $3 ch) }
-
-SubEventsCh
-  : SubEventCh { \ch -> [$1 ch] }
-  | SubEventCh ',' SubEventsCh { \ch -> $1 ch : $3 ch }
-
-SubEventCh
-  : MIDIEvent { \_ch -> Event $1 }
-  | MIDIBody { \ch -> Event $ E.MIDIEvent $ C.Cons ch $1 }
-  | '{' SubEventLinesCh '}' { \ch -> Subtrack ($2 ch) }
-
-MIDIEvent
-  : ch Int MIDIBody
-    { E.MIDIEvent $ C.Cons (C.toChannel $2) $3 }
-  | seqnum Int { E.MetaEvent $ M.SequenceNum $2 }
-  | text str { E.MetaEvent $ M.TextEvent $2 }
-  | copy str { E.MetaEvent $ M.Copyright $2 }
-  | name str { E.MetaEvent $ M.TrackName $2 }
-  | inst str { E.MetaEvent $ M.InstrumentName $2 }
-  | lyric str { E.MetaEvent $ M.Lyric $2 }
-  | mark str { E.MetaEvent $ M.Marker $2 }
-  | cue str { E.MetaEvent $ M.CuePoint $2 }
-  | prefix Int { E.MetaEvent $ M.MIDIPrefix $ C.toChannel $2 }
-  | end { E.MetaEvent M.EndOfTrack }
-  | tempo Tempo
-    { E.MetaEvent $ M.SetTempo $2 }
-  | smpte '(' Int ',' Int ',' Int ',' Int ',' Int ')'
-    { E.MetaEvent $ M.SMPTEOffset $3 $5 $7 $9 $11 }
+Meta
+  : seqnum Num { SequenceNum $2 }
+  | text str { TextEvent $2 }
+  | copy str { Copyright $2 }
+  | name str { TrackName $2 }
+  | inst str { InstrumentName $2 }
+  | lyric str { Lyric $2 }
+  | mark str { Marker $2 }
+  | cue str { CuePoint $2 }
+  | prefix Num { MIDIPrefix $2 }
+  | end { EndOfTrack }
+  | tempo Num { SetTempo $2 }
+  | smpte '(' Num ',' Num ',' Num ',' Num ',' Num ')'
+    { SMPTEOffset $3 $5 $7 $9 $11 }
   | time '(' TimeSig ClockDetails ')'
-    { E.MetaEvent $ M.TimeSig (fst $3) (snd $3) (fst $4) (snd $4) }
-  | key Mode Int
-    { E.MetaEvent $ M.KeySig $ Key.Cons $2 $ Key.Accidentals $3 }
-  | seq '(' W8List ')'
-    { E.MetaEvent $ M.SequencerSpecific $3 }
-  | meta Int '(' W8List ')'
-    { E.MetaEvent $ M.Unknown $2 $4 }
-  | sysex '(' W8List ')'
-    { E.SystemExclusive $ SysEx.Regular $3 }
-  | escape '(' W8List ')'
-    { E.SystemExclusive $ SysEx.Escape $3 }
+    { TimeSig (fst $3) (snd $3) (fst $4) (snd $4) }
+  | key Mode Num { KeySig $2 $3 }
+  | seq '(' Nums ')' { SequencerSpecific $3 }
+  | meta Num '(' Nums ')' { Unknown $2 $4 }
 
-Tempo
-  : Int { M.toTempo $1 }
-  | Rat bpm { let
-    beatPerMinute = $1
-    microsecPerMinute = 60 * 1000000
-    in M.toTempo $ floor $ microsecPerMinute / beatPerMinute
-    }
+SysEx
+  : sysex '(' Nums ')' { Regular $3 }
+  | escape '(' Nums ')' { Escape $3 }
 
 -- Parses the numerator and denominator of a time signature.
 TimeSig
-  : Int ',' Int { ($1, $3) }
-  | Int ':' Int { ($1, log2 $3) }
+  : Num ',' Num { ($1, $3) }
+  | Num ':' Num { ($1, Log2 $3) }
 
 -- Parses the # of MIDI clocks in a quarter note,
 -- and the number of 32nd notes in a quarter note.
 ClockDetails
-  : ',' Int ',' Int { ($2, $4) }
+  : ',' Num ',' Num { ($2, $4) }
   | { (24, 8) }
 
 Mode
-  : major { Key.Major }
-  | minor { Key.Minor }
+  : major { Major }
+  | minor { Minor }
 
-MIDIBody
-  : MIDIVoice { C.Voice $1 }
-  | MIDIMode { C.Mode $1 }
+MIDI
+  : on Num v Num { NoteOn $2 $4 }
+  | on Num { NoteOn $2 96 }
+  | off Num v Num { NoteOff $2 $4 }
+  | off Num { NoteOff $2 0 }
+  | after Num v Num { PolyAftertouch $2 $4 }
+  | pc Num { ProgramChange $2 }
+  | con Num v Num { Control $2 $4 }
+  | bend Num { PitchBend $2 }
+  | after v Num { MonoAftertouch $3 }
+  | soundoff { AllSoundOff }
+  | reset { ResetAllControllers }
+  | local Num { LocalControl $2 }
+  | notesoff { AllNotesOff }
+  | omni Num { OmniMode $2 }
+  | mono Num { MonoMode $2 }
+  | poly { PolyMode }
 
-MIDIVoice
-  : on Int v Int
-    { V.NoteOn (V.toPitch $2) (V.toVelocity $4) }
-  | on Int
-    { V.NoteOn (V.toPitch $2) (V.toVelocity 96) }
-  | off Int v Int
-    { V.NoteOff (V.toPitch $2) (V.toVelocity $4) }
-  | off Int
-    { V.NoteOff (V.toPitch $2) (V.toVelocity 0) }
-  | after Int v Int
-    { V.PolyAftertouch (V.toPitch $2) $4 }
-  | pc Int
-    { V.ProgramChange $ V.toProgram $2 }
-  | con Int v Int
-    { V.Control (Con.fromInt $2) $4 }
-  | bend Int
-    { V.PitchBend $2 }
-  | after v Int
-    { V.MonoAftertouch $3 }
-
-MIDIMode
-  : soundoff { Mode.AllSoundOff }
-  | reset { Mode.ResetAllControllers }
-  | local Bool { Mode.LocalControl $2 }
-  | notesoff { Mode.AllNotesOff }
-  | omni Bool { Mode.OmniMode $2 }
-  | mono Int { Mode.MonoMode $2 }
-  | poly { Mode.PolyMode }
-
-Int
-  : Rat { floor $1 :: Int }
-
-W8
-  : Int { fromIntegral $1 :: Word8 }
-
-W8List
+Nums
   : { [] }
-  | W8 { [$1] }
-  | W8 ',' W8List { $1 : $3 }
+  | Num { [$1] }
+  | Num ',' Nums { $1 : $3 }
 
-Bool
-  : Rat { $1 /= 0 }
+-- Precedence levels:
+--   (tight)
+-- prefixes
+-- suffixes
+-- * /
+-- + -
+-- |
+--   (loose)
+-- All binary ops are left associative
 
-Rat
-  : Rat '*' Rat0 { $1 * $3 }
-  | Rat '/' Rat0 { $1 / $3 }
-  | Rat0 { $1 }
+Num
+  : NumMsr { $1 }
 
-Rat0
-  : Rat0 '+' Rat1 { $1 + $3 }
-  | Rat0 '-' Rat1 { $1 - $3 }
-  | Rat1 { $1 }
+NumMsr
+  : NumMsr '|' NumAdd { Measures $1 + $3 }
+  | NumAdd { $1 }
 
-Rat1
-  : '(' Rat ')' { $2 }
-  | '-' Rat1 { negate $2 }
-  | rat { $1 }
+NumAdd
+  : NumAdd '+' NumMult { $1 + $3 }
+  | NumAdd '-' NumMult { $1 - $3 }
+  | NumMult { $1 }
+
+NumMult
+  : NumMult '*' NumSuffix { $1 * $3 }
+  | NumMult '/' NumSuffix { $1 / $3 }
+  | NumSuffix { $1 }
+
+NumSuffix
+  : NumSuffix s { Seconds $1 }
+  | NumSuffix bpm { let
+    bps = $1 / 60
+    spb = 1 / bps
+    uspb = spb * 1000000
+    in uspb
+    }
+  | NumPrefix { $1 }
+
+NumPrefix
+  : tone NumPrefix { Rat (fromIntegral $1) + $2 }
+  | '-' NumPrefix { negate $2 }
+  | NumBase { $1 }
+
+NumBase
+  : rat { Rat $1 }
+  | '(' Num ')' { $2 }
 
 {
 
 parseError :: [S.Token] -> a
 parseError _ = error "Parse error"
 
-data Extra
-  = Event E.T
-  | Subtrack [(Rational, [Extra])]
-  deriving (Eq, Ord, Show)
+type File = [(Maybe String, Track)]
 
-data Position
-  = Absolute Rational
-  | Measures Int Rational
+data Track = Track
+  { trackChannel :: Maybe Number
+  , trackEvents :: [(Number, [Event])]
+  } deriving (Eq, Ord, Show, Read)
+
+data Number
+  = Rat Rational
+  | Measures Number -- ^ measures (floored) to beats
+  | Seconds Number -- ^ seconds to beats
+  | Add Number Number
+  | Sub Number Number
+  | Mult Number Number
+  | Div Number Number
+  | Abs Number
+  | Signum Number
+  | Log2 Number
   deriving (Eq, Ord, Show, Read)
 
-flattenExtra :: [(Position, [Extra])] -> [(Position, E.T)]
-flattenExtra = concatMap $ \(pos, exs) -> let
-  addToPos rat = case pos of
-    Absolute r -> Absolute $ r + rat
-    Measures m r -> Measures m $ r + rat
-  in flip concatMap exs $ \ex -> case ex of
-    Event e -> [(pos, e)]
-    Subtrack sub -> map (first addToPos) $ flattenExtra' sub
+instance Num Number where
+  fromInteger = Rat . fromInteger
+  (+) = Add
+  (-) = Sub
+  (*) = Mult
+  abs = Abs
+  signum = Signum
 
-flattenExtra' :: [(Rational, [Extra])] -> [(Rational, E.T)]
-flattenExtra' = concatMap $ \(rat, exs) -> let
-  in flip concatMap exs $ \ex -> case ex of
-    Event e -> [(rat, e)]
-    Subtrack sub -> map (first (+ rat)) $ flattenExtra' sub
+instance Fractional Number where
+  fromRational = Rat
+  (/) = Div
 
-listsToMIDI
-  :: [(Position, E.T)] -> [(String, [(Position, E.T)])] -> StandardMIDI E.T
-listsToMIDI tmp named = let
-  toRTB = RTB.fromAbsoluteEventList . ATB.fromPairList
-    . sortBy (comparing fst) . map (first posToRat)
-  msrs = readTempoTrack tmp
-  posToRat pos = case pos of
-    Absolute r -> NN.fromNumber r
-    Measures m r -> sum (take m msrs) + NN.fromNumber r
-  namedRTBs = map (second toRTB) named
-  mergeSame ps = (fst $ head ps, foldr RTB.merge RTB.empty $ map snd ps)
-  mergeNames = map mergeSame . groupBy (equating fst) . sortBy (comparing fst)
-  equating f x y = f x == f y
-  in StandardMIDI (toRTB tmp) $ mergeNames namedRTBs
+data Event
+  = Subtrack Track
+  | Event Event'
+  deriving (Eq, Ord, Show, Read)
 
-readTempoTrack :: [(Position, E.T)] -> [NN.Rational]
-readTempoTrack evts = let
-  sigs = [ (pos, s) | (pos, e) <- evts, Just s <- [getTimeSig e] ]
-  msrList = go 0 0 4
-  go :: Int -> Rational -> NN.Rational -> [NN.Rational]
-  go msr pos sig = let
-    isNow p = case p of
-      Absolute r -> r == pos
-      Measures m r -> or
-        [ m == msr && r == 0
-        , m <  msr && NN.toNumber (sum $ take m msrList) + r == pos
-        ]
-    newSig = case filter (isNow . fst) sigs of
-      (_, s) : _ -> s
-      []         -> sig
-    in newSig : go (msr + 1) (pos + NN.toNumber newSig) newSig
-  in msrList
+data Event'
+  = Meta Meta
+  | MIDI (Maybe Number) MIDI
+  | SysEx SysEx
+  deriving (Eq, Ord, Show, Read)
 
-log2 :: Int -> Int
-log2 target = go 0 1 where
-  go !pow !at = case compare at target of
-    EQ -> pow
-    LT -> go (pow + 1) (at * 2)
-    GT -> error $ "log2: not a power of two: " ++ show target
+data Meta
+  = SequenceNum Number
+  | TextEvent String
+  | Copyright String
+  | TrackName String
+  | InstrumentName String
+  | Lyric String
+  | Marker String
+  | CuePoint String
+  | MIDIPrefix Number
+  | EndOfTrack
+  | SetTempo Number
+  | SMPTEOffset Number Number Number Number Number
+  | TimeSig Number Number Number Number
+  | KeySig Mode Number
+  | SequencerSpecific [Number]
+  | Unknown Number [Number]
+  deriving (Eq, Ord, Show, Read)
+
+data SysEx
+  = Regular [Number]
+  | Escape [Number]
+  deriving (Eq, Ord, Show, Read)
+
+data MIDI
+  = NoteOn Number Number
+  | NoteOff Number Number
+  | PolyAftertouch Number Number
+  | ProgramChange Number
+  | Control Number Number
+  | PitchBend Number
+  | MonoAftertouch Number
+  | AllSoundOff
+  | ResetAllControllers
+  | LocalControl Number
+  | AllNotesOff
+  | OmniMode Number
+  | MonoMode Number
+  | PolyMode
+  deriving (Eq, Ord, Show, Read)
+
+data Mode
+  = Major
+  | Minor
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 }

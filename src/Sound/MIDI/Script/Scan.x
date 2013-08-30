@@ -18,7 +18,6 @@ $white+ ;
 "#" [^ \n]* ;
 
 \" @str_char* \" { Token . Str . read }
-[A-Za-z]+ { Ident }
 [0-9]+ { Token . Rat . fromInteger . read }
 [0-9]+ "." [0-9]+ { \s -> let
   (whole, '.' : part) = span isDigit s
@@ -28,17 +27,17 @@ $white+ ;
   in Token $ Rat $ wholeRat + partRat
   }
 0x [0-9A-Fa-f]+ { Token . Rat . fromInteger . read }
-[CDEFGABcdefgab] ([IiEe] [Ss])* [0-9]+
-  { \s -> Token $ Rat $ fromInteger $ case map toLower s of
+[CDEFGABcdefgab] ([IiEe] [Ss])*
+  { \s -> Token $ Tone $ case map toLower s of
     k : s' -> let
       readSuffix sfx = case sfx of
-        'i' : 's' : sfx' -> first (+ 1) $ readSuffix sfx'
-        'e' : 's' : sfx' -> first (subtract 1) $ readSuffix sfx'
-        oct -> (0, read oct)
-      (mod, octave) = readSuffix s'
+        'i' : 's' : sfx' -> readSuffix sfx' + 1
+        'e' : 's' : sfx' -> readSuffix sfx' - 1
+        "" -> 0
       key = fromJust $ lookup k $ zip "cdefgab" [0, 2, 4, 5, 7, 9, 11]
-      in octave * 12 + key + mod
+      in key + readSuffix s'
   }
+[A-Za-z]+ { Ident }
 
 "+" { const $ Token Plus }
 "-" { const $ Token Dash }
@@ -63,6 +62,7 @@ data Token'
 data Token
   = Str String
   | Rat Rational
+  | Tone Int -- C is 0, D is 2, etc.
   | Plus
   | Dash
   | Star
@@ -111,6 +111,7 @@ data Token
   | Meta
   | SysEx
   | Escape
+  | Seconds
   deriving (Eq, Ord, Show, Read)
 
 identify :: Token' -> Token
@@ -153,6 +154,7 @@ identify (Ident i) = case map toLower i of
   "meta" -> Meta
   "sysex" -> SysEx
   "escape" -> Escape
+  "s" -> Seconds
   _ -> error $ "scan: unrecognized bare word " ++ show i
 identify (Token tok) = tok
 

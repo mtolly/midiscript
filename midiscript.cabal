@@ -17,6 +17,7 @@ Library
   Exposed-modules:  Sound.MIDI.Script.Base
                     Sound.MIDI.Script.Scan
                     Sound.MIDI.Script.Parse
+                    Sound.MIDI.Script.Read
   hs-source-dirs:   src
   ghc-options:      -Wall
 

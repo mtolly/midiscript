@@ -7,6 +7,7 @@ import System.Environment (getArgs, getProgName)
 import Sound.MIDI.Script.Base
 import Sound.MIDI.Script.Scan
 import Sound.MIDI.Script.Parse
+import Sound.MIDI.Script.Read
 import System.IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -78,7 +79,7 @@ handles opts h1 h2 = do
         exitFailure
     Left _ -> let
       s1 = TL.unpack $ Enc.decodeUtf8 b1
-      sm = parse $ scan s1
+      sm = readStandardFile $ parse $ scan s1
       in do
         hSetBinaryMode h2 True
         L.hPut h2 $ Save.toByteString $ fromStandardMIDI opts sm
