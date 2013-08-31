@@ -70,8 +70,8 @@ involving such). Otherwise the following could result:
       # circular reference!
     }
 
-Similarly, tempo change events must be positioned using only the forms `x` or
-`x s`, and the value must be of the form `x`.
+Similarly, tempo change events must have positions and values that either 1) do
+not contain a value in seconds (`seconds s`), or 2) are of the exact form `x s`.
 
 A particularly powerful kind of event is the "subtrack":
 

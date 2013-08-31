@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module Sound.MIDI.Script.Read where
 
@@ -28,7 +28,7 @@ readStandardFile f = let
   tempoTrk = concat $ map flattenTrack [ trk | (Nothing, trk) <- f ]
   restTrks = map (second flattenTrack) [ (name, trk) | (Just name, trk) <- f ]
   msrs = getTimeSignatures tempoTrk
-  tmps = getTempos tempoTrk
+  tmps = getTempos msrs tempoTrk
   tempoTrk' = readTrack msrs tmps tempoTrk
   restTrks' = map (second $ readTrack msrs tmps) $ mergeNames restTrks
   mergeNames = map mergeSame . groupBy (equating fst) . sortBy (comparing fst)
@@ -36,7 +36,7 @@ readStandardFile f = let
   equating g x y = g x == g y
   in StandardMIDI tempoTrk' restTrks'
 
-readTrack :: [NN.Rational] -> [(Rational, Rational, Int)] ->
+readTrack :: [Rational] -> [(Rational, Rational, Int)] ->
   [(Number, Event')] -> RTB.T NN.Rational E.T
 readTrack msrs tmps trk = let
   num = evalNumber msrs tmps
@@ -127,6 +127,25 @@ isMeasureBeats n = case n of
     b <- isRational n
     return (0, b)
 
+-- | Tries to evaluate the number using time signature events, but not tempos.
+isMeasureBeats' :: [Rational] -> Number -> Maybe Rational
+isMeasureBeats' msrs n = case n of
+  Rat r -> Just r
+  Measures m -> case rec m of
+    Just r  -> Just $ fromMeasureBeats msrs (floor r, 0)
+    Nothing -> Nothing
+  Seconds s -> case isRational s of
+    Just 0 -> Just 0
+    _      -> Nothing
+  Add  x y -> liftA2 (+) (rec x) (rec y)
+  Sub  x y -> liftA2 (-) (rec x) (rec y)
+  Mult x y -> liftA2 (*) (rec x) (rec y)
+  Div  x y -> liftA2 (/) (rec x) (rec y)
+  Abs    x -> fmap abs $ rec x
+  Signum x -> fmap signum $ rec x
+  Log2   x -> fmap (fromIntegral . log2 . floor) $ rec x
+  where rec = isMeasureBeats' msrs
+
 isSeconds :: Number -> Maybe Rational
 isSeconds n = case n of
   Rat 0 -> Just 0
@@ -166,15 +185,26 @@ isTimeSignature (pos, evt) = case evt of
       ]
   _ -> Nothing
 
+fromMeasureBeats :: [Rational] -> (Int, Rational) -> Rational
+fromMeasureBeats msrs (m, b)
+  | m >= 0    = sum (take m msrs) + b
+  | otherwise = error $ unwords
+    [ "fromMeasureBeats:"
+    , "tried to take"
+    , show m
+    , "measures"
+    ]
+
 -- | Tries to parse a legal tempo change event into
 -- (either seconds or beats, microsecs per quarter note).
-isTempo :: (Number, Event') -> Maybe (Either Rational Rational, Int)
-isTempo (pos, evt) = case evt of
-  Meta (SetTempo n) -> case isRational n of
+isTempo ::
+  [Rational] -> (Number, Event') -> Maybe (Either Rational Rational, Int)
+isTempo msrs (pos, evt) = case evt of
+  Meta (SetTempo n) -> case isMeasureBeats' msrs n of
     Just uspqn -> case isSeconds pos of
       Just s | s >= 0 -> Just (Left s, floor uspqn)
-      _ -> case isRational pos of
-        Just b | b >= 0 -> Just (Right b, floor uspqn)
+      _ -> case isMeasureBeats pos of
+        Just (fromMeasureBeats msrs -> b) -> Just (Right b, floor uspqn)
         _ -> error $ unwords
           [ "isTempo:"
           , "tempo change at an invalid position:"
@@ -187,7 +217,7 @@ isTempo (pos, evt) = case evt of
       ]
   _ -> Nothing
 
-getTimeSignatures :: [(Number, Event')] -> [NN.Rational]
+getTimeSignatures :: [(Number, Event')] -> [Rational]
 getTimeSignatures evts = let
   sigs = mapMaybe isTimeSignature evts
   msrList = go 0 0 4
@@ -201,13 +231,13 @@ getTimeSignatures evts = let
       (_, _, s) : _ -> s
       []            -> sig
     in newSig : go (msr + 1) (pos + newSig) newSig
-  in map NN.fromNumber msrList
+  in msrList
 
 -- | Outputs a list of (seconds, beats, microseconds per quarter note).
-getTempos :: [(Number, Event')] -> [(Rational, Rational, Int)]
-getTempos evts = let
+getTempos :: [Rational] -> [(Number, Event')] -> [(Rational, Rational, Int)]
+getTempos msrs evts = let
   bpm120 = 500000
-  tmps = mapMaybe isTempo evts
+  tmps = mapMaybe (isTempo msrs) evts
   initTempo = case [ x | (p, x) <- tmps, elem p [Left 0, Right 0] ] of
     []    -> bpm120
     x : _ -> x
@@ -232,11 +262,11 @@ getTempos evts = let
       (s, b, u) : _ -> go s b u
   in dropSimultaneous $ go 0 0 initTempo
 
-evalNumber :: [NN.Rational] -> [(Rational, Rational, Int)] -> Number -> Rational
+evalNumber :: [Rational] -> [(Rational, Rational, Int)] -> Number -> Rational
 evalNumber msrs tmps = go where
   go n = case n of
     Rat r -> r
-    Measures m -> NN.toNumber $ sum $ take (floor $ go m) msrs
+    Measures m -> sum $ take (floor $ go m) msrs
     Seconds s -> let
       s' = go s
       in case reverse $ takeWhile (\(secs, _, _) -> secs <= s') tmps of
