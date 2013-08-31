@@ -101,6 +101,7 @@ File
 
 TopTrack
   : tempo Track { (Nothing, $2) }
+  | time Track { (Nothing, $2) }
   | str Track { (Just $1, $2) }
 
 Track
