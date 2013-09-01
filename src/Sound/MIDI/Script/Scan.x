@@ -107,6 +107,7 @@ data Token
   | MonoMode
   | PolyMode
   | BPM
+  | BPS
   | Sequencer
   | Meta
   | SysEx
@@ -150,6 +151,7 @@ identify (Ident i) = case map toLower i of
   "mono" -> MonoMode
   "poly" -> PolyMode
   "bpm" -> BPM
+  "bps" -> BPS
   "seq" -> Sequencer
   "meta" -> Meta
   "sysex" -> SysEx

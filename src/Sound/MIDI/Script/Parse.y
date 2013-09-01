@@ -87,6 +87,7 @@ import Data.Word (Word8)
   mono { S.MonoMode }
   poly { S.PolyMode }
   bpm { S.BPM }
+  bps { S.BPS }
   seq { S.Sequencer }
   meta { S.Meta }
   sysex { S.SysEx }
@@ -221,6 +222,12 @@ NumSuffix
   : NumSuffix s { Seconds $1 }
   | NumSuffix bpm { let
     bps = $1 / 60
+    spb = 1 / bps
+    uspb = spb * 1000000
+    in uspb
+    }
+  | NumSuffix bps { let
+    bps = $1
     spb = 1 / bps
     uspb = spb * 1000000
     in uspb
