@@ -15,23 +15,6 @@ module Sound.MIDI.Script.Parse
 ) where
 
 import qualified Sound.MIDI.Script.Scan as S
-{-
-import qualified Sound.MIDI.File.Event as E
-import qualified Sound.MIDI.File.Event.Meta as M
-import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
-import qualified Sound.MIDI.Message.Channel as C
-import qualified Sound.MIDI.Message.Channel.Voice as V
-import qualified Sound.MIDI.Message.Channel.Mode as Mode
-import qualified Sound.MIDI.Controller as Con
-import qualified Sound.MIDI.KeySignature as Key
-import qualified Data.EventList.Relative.TimeBody as RTB
-import qualified Data.EventList.Absolute.TimeBody as ATB
-import qualified Numeric.NonNegative.Wrapper as NN
-import Control.Arrow (first, second)
-import Data.List (sortBy, groupBy)
-import Data.Ord (comparing)
-import Data.Word (Word8)
--}
 
 }
 
@@ -93,6 +76,7 @@ import Data.Word (Word8)
   sysex { S.SysEx }
   escape { S.Escape }
   s { S.Seconds }
+  len { S.Length }
 
 %%
 
@@ -128,10 +112,28 @@ Event
   | ch Num MIDI { Event $ MIDI (Just $2) $3 }
   | MIDI { Event $ MIDI Nothing $1 }
   | SysEx { Event $ SysEx $1 }
+  -- combined note on/off events
+  | ch Num FullNote { $3 (Just $2) }
+  | FullNote { $1 Nothing }
+
+FullNote
+  : on Num v Num len Num
+    { \ch -> Subtrack $ Track ch
+        [ (0 , [Event $ MIDI Nothing $ NoteOn  $2 $4])
+        , ($6, [Event $ MIDI Nothing $ NoteOff $2 0 ])
+        ]
+    }
+  | on Num len Num
+    { \ch -> Subtrack $ Track ch
+        [ (0 , [Event $ MIDI Nothing $ NoteOn  $2 96])
+        , ($4, [Event $ MIDI Nothing $ NoteOff $2 0 ])
+        ]
+    }
 
 Meta
   : seqnum Num { SequenceNum $2 }
   | text str { TextEvent $2 }
+  | str { TextEvent $1 }
   | copy str { Copyright $2 }
   | name str { TrackName $2 }
   | inst str { InstrumentName $2 }

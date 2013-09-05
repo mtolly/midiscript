@@ -113,6 +113,7 @@ data Token
   | SysEx
   | Escape
   | Seconds
+  | Length
   deriving (Eq, Ord, Show, Read)
 
 identify :: Token' -> Token
@@ -157,6 +158,7 @@ identify (Ident i) = case map toLower i of
   "sysex" -> SysEx
   "escape" -> Escape
   "s" -> Seconds
+  "len" -> Length
   _ -> error $ "scan: unrecognized bare word " ++ show i
 identify (Token tok) = tok
 
