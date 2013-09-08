@@ -95,20 +95,32 @@ Track
 
 TrackEvents
   : { [] }
-  | TrackEvent { [$1] }
-  | TrackEvent ';' TrackEvents { $1 : $3 }
+  | TrackEventNotEndSubtrack { [$1] }
+  | TrackEventEndSubtrack ';' TrackEvents { $1 : $3 }
+  | TrackEventEndSubtrack TrackEvents { $1 : $2 }
+  | TrackEventNotEndSubtrack ';' TrackEvents { $1 : $3 }
 
-TrackEvent
-  : Num ':' Events { ($1, $3) }
+TrackEventEndSubtrack
+  : Num ':' EventsEndSubtrack { ($1, $3) }
 
-Events
-  : { [] }
-  | Event { [$1] }
-  | Event ',' Events { $1 : $3 }
+TrackEventNotEndSubtrack
+  : Num ':' EventsEndAtom { ($1, $3) }
+  | Num ':' { ($1, []) }
+
+EventsEndAtom
+  : EventNotSubtrack { [$1] }
+  | Event ',' EventsEndAtom { $1 : $3 }
+
+EventsEndSubtrack
+  : Track { [Subtrack $1] }
+  | Event ',' EventsEndSubtrack { $1 : $3 }
 
 Event
   : Track { Subtrack $1 }
-  | Meta { Event $ Meta $1 }
+  | EventNotSubtrack { $1 }
+
+EventNotSubtrack
+  : Meta { Event $ Meta $1 }
   | ch Num MIDI { Event $ MIDI (Just $2) $3 }
   | MIDI { Event $ MIDI Nothing $1 }
   | SysEx { Event $ SysEx $1 }
