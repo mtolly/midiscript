@@ -29,3 +29,13 @@ Executable midiscript
                     , text
                     , bytestring
   ghc-options:      -Wall
+
+Executable rbncheck
+  Main-Is:          misc/rbncheck.hs
+  Build-Depends:    base >= 4 && < 5
+                    , midi
+                    , midiscript
+                    , event-list
+                    , non-negative
+                    , transformers
+  ghc-options:      -Wall
