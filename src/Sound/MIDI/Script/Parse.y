@@ -249,7 +249,7 @@ NumSuffix
   | NumPrefix { $1 }
 
 NumPrefix
-  : tone NumPrefix { Rat (fromIntegral $1) + $2 }
+  : tone NumPrefix { Rat (fromIntegral $1) + (12 * $2) }
   | '-' NumPrefix { negate $2 }
   | NumBase { $1 }
 
