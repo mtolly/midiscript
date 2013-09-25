@@ -25,14 +25,14 @@ import Data.Ord (comparing)
 
 readStandardFile :: File -> StandardMIDI E.T
 readStandardFile f = let
-  tempoTrk = concat $ map flattenTrack [ trk | (Nothing, trk) <- f ]
+  tempoTrk = concatMap flattenTrack [ trk | (Nothing, trk) <- f ]
   restTrks = map (second flattenTrack) [ (name, trk) | (Just name, trk) <- f ]
   msrs = getTimeSignatures tempoTrk
   tmps = getTempos msrs tempoTrk
   tempoTrk' = readTrack msrs tmps tempoTrk
   restTrks' = map (second $ readTrack msrs tmps) $ mergeNames restTrks
   mergeNames = map mergeSame . groupBy (equating fst) . sortBy (comparing fst)
-  mergeSame ps = (fst $ head ps, concat $ map snd ps)
+  mergeSame ps = (fst $ head ps, concatMap snd ps)
   equating g x y = g x == g y
   in StandardMIDI tempoTrk' restTrks'
 
@@ -87,7 +87,7 @@ readTrack msrs tmps trk = let
     SysEx sys -> E.SystemExclusive $ case sys of
       Regular ns -> SysEx.Regular $ map int ns
       Escape ns -> SysEx.Escape $ map int ns
-  in RTB.fromAbsoluteEventList $ ATB.fromPairList $ sortBy (comparing fst) $
+  in RTB.fromAbsoluteEventList $ ATB.fromPairList $ sortBy (comparing fst)
     [ (NN.fromNumber $ num n, readEvent e) | (n, e) <- trk ]
 
 -- | Tries to evaluate the number without using time signatures or tempos.

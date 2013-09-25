@@ -16,6 +16,7 @@ import qualified Data.Text.Lazy.Encoding as Enc
 import System.Console.GetOpt
 import System.Exit (exitFailure)
 import Data.List (intercalate)
+import qualified Data.Foldable as F
 
 data Flag
   = BeatPosns
@@ -52,16 +53,15 @@ main = getArgs >>= \argv -> let
   output = case files of
     _ : f : _ | f /= "-" -> withFile f WriteMode
     _                -> ($ stdout)
-  in do
-    if not $ null errs
-      then do
-        mapM_ (hPutStrLn stderr) errs
-        printUsage
-        exitFailure
-      else if any (== Usage) flags
-        then printUsage
-        else input $ \h1 -> output $ \h2 ->
-          handles (applyFlags flags defaultOptions) h1 h2
+  in if not $ null errs
+    then do
+      mapM_ (hPutStrLn stderr) errs
+      printUsage
+      exitFailure
+    else if elem Usage flags
+      then printUsage
+      else input $ \h1 -> output $ \h2 ->
+        handles (applyFlags flags defaultOptions) h1 h2
 
 handles :: Options -> Handle -> Handle -> IO ()
 handles opts h1 h2 = do
@@ -83,9 +83,7 @@ handles opts h1 h2 = do
       in do
         hSetBinaryMode h2 True
         let (mid, warn) = fromStandardMIDI opts sm
-        case warn of
-          Nothing -> return ()
-          Just w -> hPutStrLn stderr w
+        F.mapM_ (hPutStrLn stderr) warn
         L.hPut h2 $ Save.toByteString mid
 
 printUsage :: IO ()

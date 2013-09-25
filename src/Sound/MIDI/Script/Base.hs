@@ -149,7 +149,7 @@ showAsMeasure = go 0 where
       then {- msr <= pos -} go (m + 1) msrs d
       else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
 
-showStandardMIDI :: Options -> (StandardMIDI E.T) -> String
+showStandardMIDI :: Options -> StandardMIDI E.T -> String
 showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
