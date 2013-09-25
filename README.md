@@ -122,7 +122,7 @@ Options:
 
     -b     : for mid -> txt, positions are written as beats (default)
     -m     : for mid -> txt, positions are written as measures|beats
-    -r INT : for txt -> mid, minimum resolution of output file (default 480)
+    -r INT : for txt -> mid, resolution of output file (default is minimum for no rounding)
 
 The `-m` option is much more readable for humans, but the `-b` option is useful
 when you want to edit time signatures without moving events.

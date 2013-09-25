@@ -38,9 +38,9 @@ options =
 
 applyFlags :: [Flag] -> Options -> Options
 applyFlags = foldr (.) id . map applyFlag where
-  applyFlag BeatPosns      o = o { measurePosns = False }
-  applyFlag MeasurePosns   o = o { measurePosns = True  }
-  applyFlag (Resolution r) o = o { resolution   = r     }
+  applyFlag BeatPosns      o = o { measurePosns = False  }
+  applyFlag MeasurePosns   o = o { measurePosns = True   }
+  applyFlag (Resolution r) o = o { resolution   = Just r }
   applyFlag _              o = o
 
 main :: IO ()
@@ -82,7 +82,11 @@ handles opts h1 h2 = do
       sm = readStandardFile $ parse $ scan s1
       in do
         hSetBinaryMode h2 True
-        L.hPut h2 $ Save.toByteString $ fromStandardMIDI opts sm
+        let (mid, warn) = fromStandardMIDI opts sm
+        case warn of
+          Nothing -> return ()
+          Just w -> hPutStrLn stderr w
+        L.hPut h2 $ Save.toByteString mid
 
 printUsage :: IO ()
 printUsage = do

@@ -31,13 +31,13 @@ import Numeric (showHex)
 
 data Options = Options
   { measurePosns :: Bool
-  , resolution :: Integer
+  , resolution   :: Maybe Integer
   } deriving (Eq, Ord, Show, Read)
 
 defaultOptions :: Options
 defaultOptions = Options
   { measurePosns = False
-  , resolution = 480
+  , resolution   = Nothing
   }
 
 data StandardMIDI a = StandardMIDI
@@ -81,17 +81,22 @@ toStandardMIDI (F.Cons F.Parallel (F.Ticks res) trks) = let
       "Tracks without names (0 is tempo track): " ++ show unnamedIndexes
 toStandardMIDI _ = Left "Not a type-1 (parallel) ticks-based MIDI"
 
-fromStandardMIDI :: Options -> StandardMIDI E.T -> F.T
+fromStandardMIDI :: Options -> StandardMIDI E.T -> (F.T, Maybe String)
 fromStandardMIDI opts sm = let
   withNames = flip map (namedTracks sm) $ \(s, rtb) ->
     RTB.cons 0 (E.MetaEvent (M.TrackName s)) rtb
   allBeats = tempoTrack sm : withNames
   denoms = flip concatMap allBeats $
     map (denominator . NN.toNumber . fst) . RTB.toPairList
-  res = fromIntegral $ foldr lcm (resolution opts) denoms :: NN.Int
-  res' = fromIntegral res :: NN.Rational
-  allTicks = flip map allBeats $ RTB.mapTime $ \dt -> floor $ dt * res'
-  in F.Cons F.Parallel (F.Ticks res) allTicks
+  minRes = foldr lcm 1 denoms
+  res = fromMaybe minRes $ resolution opts
+  resWarn = if gcd res minRes == minRes
+    then Nothing
+    else Just $
+      "Chosen resolution (" ++ show res ++ ") results in rounding; accurate resolution must be a multiple of " ++ show minRes
+  allTicks = flip map allBeats $
+    RTB.discretize . RTB.mapTime (\dt -> dt * fromIntegral res)
+  in (F.Cons F.Parallel (F.Ticks $ fromIntegral res) allTicks, resWarn)
 
 -- | Drops an amount of time @t@ from the event list. Events exactly at position
 -- @t@ are kept.
