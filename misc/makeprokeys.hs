@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import qualified Data.EventList.Relative.TimeBody as RTB
 import qualified Data.EventList.Absolute.TimeBody as ATB
@@ -12,28 +12,22 @@ import qualified Sound.MIDI.Message.Channel.Voice as V
 import qualified Sound.MIDI.File.Load as Load
 import qualified Sound.MIDI.File.Save as Save
 
-import Data.List (nub, intersect, minimumBy)
-import Data.Maybe (fromJust, mapMaybe)
-import System.Environment (getArgs)
+import Data.List (nub, intersect, sort, sortBy)
 import Data.Ord (comparing)
+import Data.Maybe (fromJust, listToMaybe, catMaybes)
+import System.Environment (getArgs)
 
 main :: IO ()
 main = do
   [mid] <- getArgs
   F.Cons typ dvn [tmp, trk] <- Load.fromFile mid
-  let evts = toEvents trk
-      poss = possibilities evts
-  case poss of
-    [] -> putStrLn "No possible renderings."
-    _ -> do
-      -- putStrLn $ show (length poss) ++ " possible renderings."
-      let trk' = minimumByComparing (score evts) poss
-          m = F.Cons typ dvn [tmp, fromEvents trk']
-      putStrLn $ show (score evts trk') ++ " is the minimum score."
-      Save.toFile (mid ++ ".new.mid") m
-
-minimumByComparing :: (Ord b) => (a -> b) -> [a] -> a
-minimumByComparing f xs = snd $ minimumBy (comparing fst) $ zip (map f xs) xs
+  let poss = possibilities $ toEvents trk
+  case goodRender poss of
+    Nothing -> error "No possible renderings."
+    Just pairs -> do
+      let trk' = fromEvents $ fmap (uncurry Note) pairs
+          newFile = F.Cons typ dvn [tmp, trk']
+      Save.toFile (mid ++ ".new.mid") newFile
 
 data Range = C | D | E | F | G | A
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
@@ -96,6 +90,7 @@ possibleNotes rs p = let
   target = mod p 12
   in filter (\n -> target == mod n 12) goodNotes
 
+{-
 takeTime :: (Num t, Ord t) => t -> RTB.T t a -> RTB.T t a
 takeTime len
   = RTB.fromAbsoluteEventList
@@ -103,7 +98,9 @@ takeTime len
   . takeWhile (\(t, _) -> t < len)
   . ATB.toPairList
   . RTB.toAbsoluteEventList 0
+-}
 
+{-
 overlaps :: (Num t, Ord t) => RTB.T t (Event t) -> Bool
 overlaps rtb = case RTB.viewL rtb of
   Nothing -> False
@@ -114,25 +111,42 @@ overlaps rtb = case RTB.viewL rtb of
       isOverlap _           = False
       in any isOverlap stretch || overlaps xs
     _ -> overlaps xs
+-}
 
-possibilities :: (NN.C t, Num t) => RTB.T t (Event t) -> [RTB.T t (Event t)]
-possibilities = filter (not . overlaps) . go . PKState Nothing . RTB.normalize
+{-
+rtbListBind :: RTB.T t [a] -> [RTB.T t a]
+rtbListBind rtb = case RTB.viewL rtb of
+  Nothing -> [RTB.empty]
+  Just ((t, xs), rtb') -> do
+    x    <- xs
+    rest <- rtbListBind rtb'
+    return $ RTB.cons t x rest
+-}
+
+{-
+justRanges :: (NN.C t) => RTB.T t (Event t) -> RTB.T t (Event t)
+justRanges = RTB.filter $ \x -> case x of
+  Note _ _ -> False
+  _        -> True
+-}
+
+possibilities :: (NN.C t, Num t) => RTB.T t (Event t) -> RTB.T t (Pitch, [Pitch], t)
+possibilities = go . PKState Nothing . RTB.normalize
   where
-    go :: (NN.C t, Num t) => PKState t -> [RTB.T t (Event t)]
+    go :: (NN.C t, Num t) => PKState t -> RTB.T t (Pitch, [Pitch], t)
     go st = case RTB.viewL $ vTrack st of
-      Nothing -> [RTB.empty]
+      Nothing -> RTB.empty
       Just ((t, x), xs) -> let
         st' = st { vTrack = xs }
         in case x of
-          Note p len -> case crossedRanges st' len of
-            Nothing   -> [] -- Note before the first range shift has completed.
-            Just rngs -> do
-              p'   <- possibleNotes rngs p
-              rest <- go st'
-              return $ RTB.cons t (Note p' len) rest
+          Note p len -> let
+            poss = case crossedRanges st' len of
+              Nothing   -> []
+              Just rngs -> possibleNotes rngs p
+            in RTB.cons t (p, poss, len) $ go st'
           _ -> let
             st'' = st' { vRanges = isRange x }
-            in map (RTB.delay t) $ go st''
+            in RTB.delay t $ go st''
 
 toEvents :: (NN.C t) => RTB.T t E.T -> RTB.T t (Event t)
 toEvents = go Nothing where
@@ -158,12 +172,7 @@ fromEvents = rtbJoin . fmap f where
   noteOn p = voice $ V.NoteOn (V.toPitch p) (V.toVelocity 96)
   noteOff p = voice $ V.NoteOff (V.toPitch p) (V.toVelocity 0)
   rangeToKey r = case r of
-    C -> 0
-    D -> 2
-    E -> 4
-    F -> 5
-    G -> 7
-    A -> 9
+    C -> 0; D -> 2; E -> 4; F -> 5; G -> 7; A -> 9
   f (Shift _ to) = RTB.singleton NN.zero $ noteOn $ rangeToKey to
   f (FinishShift to) = RTB.singleton NN.zero $ noteOff $ rangeToKey to
   f (Note p len) = RTB.fromPairList [(NN.zero, noteOn p), (len, noteOff p)]
@@ -194,44 +203,38 @@ isNoteOff e = case e of
   E.MIDIEvent (C.Cons _ (C.Voice (V.NoteOff p _v))) -> Just $ V.fromPitch p
   _ -> Nothing
 
--- | Computes an "ugliness score" for a given rendering. First argument
--- is the original keys part; second argument is the rendering. The score
--- assigns points for places where single notes have different intervals,
--- and chords have different shapes, so a lower score is better.
-score :: (NN.C t, Real t) => RTB.T t (Event t) -> RTB.T t (Event t) -> Int
-score orig new = let
-  both = RTB.merge (fmap Left orig) (fmap Right new)
-  toPitchPair xs = let
-    leftPitches = flip mapMaybe xs $ \x -> case x of
-      Left (Note p _) -> Just p
-      _               -> Nothing
-    rightPitches = flip mapMaybe xs $ \x -> case x of
-      Right (Note p _) -> Just p
-      _                -> Nothing
-    in (leftPitches, rightPitches)
-  pitchPairs = RTB.filter (\(x, y) -> not $ null x || null y) $
-    fmap toPitchPair $ RTB.collectCoincident both
-  rtbToIntervals rtb = case RTB.viewL rtb of
-    Nothing -> []
-    Just ((_, x), xs) -> case RTB.viewL xs of
-      Nothing -> []
-      Just ((_, y), _) -> (x, y) : rtbToIntervals xs
-  scoreIntervals =
-    sum $ map (uncurry scoreInterval) $ rtbToIntervals pitchPairs
-  scoreInstants = sum $ map scoreInstant $ RTB.getBodies pitchPairs
-  in scoreIntervals + scoreInstants
+-- | Renders notes while trying to avoid switching intervals between single
+-- notes, and revoicing chords. We try to make the best decision at every
+-- point, and only backtrack if we get zero possibilities, so this may not get
+-- the best solution.
+goodRender
+  :: (NN.C t, Num t, Show t) => RTB.T t (Pitch, [Pitch], t) -> Maybe (RTB.T t (Pitch, t))
+goodRender = go Nothing . RTB.collectCoincident where
+  go :: (NN.C t, Num t, Show t) => Maybe (Pitch, Pitch) ->
+    RTB.T t [(Pitch, [Pitch], t)] -> Maybe (RTB.T t (Pitch, t))
+  go prev rtb = case RTB.viewL rtb of
+    Nothing -> Just RTB.empty
+    Just ((t, x), xs) -> case x of
+      [(single, singleChoices, len)] -> let
+        sorted = case prev of
+          Nothing -> sort singleChoices
+          Just (a, b) -> let
+            lastDiff = single - a
+            diffValue p = let
+              thisDiff = p - b
+              in abs $ thisDiff - lastDiff
+            in sortBy (comparing diffValue) singleChoices
+        choose p = fmap (RTB.cons t (p, len)) $
+          go (Just (single, p)) $ removeChoice len p xs
+        in listToMaybe $ catMaybes $ map choose sorted
+      _ -> error "goodRender: chords not supported yet"
 
-scoreInterval :: ([Pitch], [Pitch]) -> ([Pitch], [Pitch]) -> Int
-scoreInterval ([a], [b]) ([c], [d]) = if compare a c /= compare b d
-  then 1
-  else 0
-scoreInterval _ _ = 0
-
-scoreInstant :: ([Pitch], [Pitch]) -> Int
-scoreInstant ([], []) = 0
-scoreInstant ([], _) = 20
-scoreInstant (_, []) = 20
-scoreInstant (x, y) = let key n = mod n 12 in sum
-  [ if key (minimum x) /= key (minimum y) then 2 else 0
-  , if key (maximum x) /= key (maximum y) then 2 else 0
-  ]
+removeChoice :: (Num t, Ord t, Eq a) =>
+  t -> a -> RTB.T t [(a, [a], b)] -> RTB.T t [(a, [a], b)]
+removeChoice len x rtb = case RTB.viewL rtb of
+  Nothing -> RTB.empty
+  Just ((t, y), ys) -> if len > t
+    then let
+      y' = map (\(a, b, c) -> (a, filter (/= x) b, c)) y
+      in RTB.cons t y' $ removeChoice (len - t) x ys
+    else rtb
