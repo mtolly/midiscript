@@ -8,12 +8,12 @@ Cabal-version:      >= 1.8
 Category:           Data
 
 Library
-  Build-Depends:    base >= 4 && < 5
-                    , non-negative
-                    , midi
-                    , event-list
-                    , utility-ht
-                    , array
+  Build-Depends:    base           >= 4.6   && < 5
+                    , array        >= 0.4   && < 0.5
+                    , event-list   >= 0.1   && < 0.2
+                    , midi         >= 0.2   && < 0.3
+                    , non-negative >= 0.1   && < 0.2
+                    , utility-ht   >= 0.0.1 && < 0.1
   Exposed-modules:  Sound.MIDI.Script.Base
                     Sound.MIDI.Script.Scan
                     Sound.MIDI.Script.Parse
@@ -23,19 +23,19 @@ Library
 
 Executable midiscript
   Main-Is:          src/Main.hs
-  Build-Depends:    base >= 4 && < 5
-                    , midi
+  Build-Depends:    base         >= 4.6  && < 5
+                    , bytestring >= 0.10 && < 0.11
+                    , midi       >= 0.2  && < 0.3
+                    , text       >= 0.11 && < 0.12
                     , midiscript
-                    , text
-                    , bytestring
   ghc-options:      -Wall
 
 Executable rbncheck
   Main-Is:          misc/rbncheck.hs
-  Build-Depends:    base >= 4 && < 5
-                    , midi
+  Build-Depends:    base           >= 4.6 && < 5
+                    , event-list   >= 0.1 && < 0.2
+                    , midi         >= 0.2 && < 0.3
+                    , non-negative >= 0.1 && < 0.2
+                    , transformers >= 0.3 && < 0.4
                     , midiscript
-                    , event-list
-                    , non-negative
-                    , transformers
   ghc-options:      -Wall

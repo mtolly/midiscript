@@ -1,22 +1,29 @@
 module Main where
 
-import qualified Sound.MIDI.File.Load as Load
-import qualified Sound.MIDI.File.Save as Save
-import qualified Sound.MIDI.Parser.Report as Report
+import qualified Data.Foldable as F
+import Data.List (intercalate)
+import System.Console.GetOpt
+  ( getOpt, usageInfo, ArgOrder(..), ArgDescr(..), OptDescr(..)
+  )
 import System.Environment (getArgs, getProgName)
+import System.Exit (exitFailure)
+import System.IO
+  ( hPutStr, hPutStrLn, hSetBinaryMode, Handle, IOMode(..), withFile
+  , stdin, stdout, stderr
+  )
+
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Lazy     as L
+import qualified Data.Text.Lazy           as TL
+import qualified Data.Text.Lazy.Encoding  as Enc
+import qualified Sound.MIDI.File.Load     as Load
+import qualified Sound.MIDI.File.Save     as Save
+import qualified Sound.MIDI.Parser.Report as Report
+
 import Sound.MIDI.Script.Base
-import Sound.MIDI.Script.Scan
 import Sound.MIDI.Script.Parse
 import Sound.MIDI.Script.Read
-import System.IO
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as L
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as Enc
-import System.Console.GetOpt
-import System.Exit (exitFailure)
-import Data.List (intercalate)
-import qualified Data.Foldable as F
+import Sound.MIDI.Script.Scan
 
 data Flag
   = BeatPosns

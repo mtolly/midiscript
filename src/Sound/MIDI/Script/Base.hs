@@ -1,33 +1,40 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 {-# LANGUAGE BangPatterns #-}
-module Sound.MIDI.Script.Base where
+module Sound.MIDI.Script.Base
+( Options(..)
+, defaultOptions
+, StandardMIDI(..)
+, toStandardMIDI
+, fromStandardMIDI
+, showStandardMIDI
+, makeMeasures
+, showAsMeasure
+) where
 
-import qualified Sound.MIDI.File as F
-import qualified Sound.MIDI.File.Event as E
-import qualified Sound.MIDI.File.Event.Meta as M
-import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
-import qualified Sound.MIDI.Message.Channel as C
-import qualified Sound.MIDI.Message.Channel.Voice as V
-import qualified Sound.MIDI.Message.Channel.Mode as Mode
-import qualified Sound.MIDI.Controller as Con
-import qualified Sound.MIDI.KeySignature as Key
-
-import qualified Data.EventList.Relative.TimeBody as RTB
-import qualified Data.EventList.Absolute.TimeBody as ATB
-
-import qualified Numeric.NonNegative.Class as NN
-import qualified Numeric.NonNegative.Wrapper as NN
-
-import Data.Ratio
-import Data.Maybe
-import Data.List.HT (partitionMaybe)
 import Control.Arrow (first)
 import Control.Monad (guard)
-import Data.List (sort, sortBy, intercalate)
-import Data.Char (toLower)
-import Data.Ord (comparing)
-import Data.Word (Word8)
-import Numeric (showHex)
+import Data.Char     (toLower)
+import Data.List     (sort, sortBy, intercalate)
+import Data.Maybe    (isNothing, fromMaybe, catMaybes, mapMaybe)
+import Data.Ord      (comparing)
+import Data.Ratio    (numerator, denominator)
+import Data.Word     (Word8)
+import Numeric       (showHex)
+
+import qualified Data.EventList.Absolute.TimeBody      as ATB
+import qualified Data.EventList.Relative.TimeBody      as RTB
+import Data.List.HT (partitionMaybe)
+import qualified Numeric.NonNegative.Class             as NNC
+import qualified Numeric.NonNegative.Wrapper           as NN
+import qualified Sound.MIDI.Controller                 as Con
+import qualified Sound.MIDI.File                       as F
+import qualified Sound.MIDI.File.Event                 as E
+import qualified Sound.MIDI.File.Event.Meta            as M
+import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
+import qualified Sound.MIDI.KeySignature               as Key
+import qualified Sound.MIDI.Message.Channel            as C
+import qualified Sound.MIDI.Message.Channel.Mode       as Mode
+import qualified Sound.MIDI.Message.Channel.Voice      as V
 
 data Options = Options
   { measurePosns :: Bool
@@ -41,23 +48,23 @@ defaultOptions = Options
   }
 
 data StandardMIDI a = StandardMIDI
-  { tempoTrack :: RTB.T NN.Rational a
+  { tempoTrack  :: RTB.T NN.Rational a
   , namedTracks :: [(String, RTB.T NN.Rational a)]
   } deriving (Eq, Ord, Show)
 
 -- | Extracts all events at position zero from the event list.
-viewZero :: (NN.C t) => RTB.T t a -> ([a], RTB.T t a)
+viewZero :: (NNC.C t) => RTB.T t a -> ([a], RTB.T t a)
 viewZero xs = case RTB.viewL xs of
-  Just ((dt, x), xs') | dt == NN.zero -> first (x :) $ viewZero xs'
+  Just ((dt, x), xs') | dt == NNC.zero -> first (x :) $ viewZero xs'
   _                                   -> ([], xs)
 
 -- | Attaches a list of events at position zero of the event list.
-unviewZero :: (NN.C t) => [a] -> RTB.T t a -> RTB.T t a
-unviewZero = foldr (.) id . map (RTB.cons NN.zero)
+unviewZero :: (NNC.C t) => [a] -> RTB.T t a -> RTB.T t a
+unviewZero = foldr (.) id . map (RTB.cons NNC.zero)
 
 -- | If the track has a single track name event at position zero, extracts it
 -- and returns the name plus the rest of the events.
-getTrackName :: (NN.C t) => RTB.T t E.T -> Maybe (String, RTB.T t E.T)
+getTrackName :: (NNC.C t) => RTB.T t E.T -> Maybe (String, RTB.T t E.T)
 getTrackName rtb = let
   (zs, rtb') = viewZero rtb
   isTrackName x = case x of
@@ -100,10 +107,10 @@ fromStandardMIDI opts sm = let
 
 -- | Drops an amount of time @t@ from the event list. Events exactly at position
 -- @t@ are kept.
-dropTime :: (NN.C t) => t -> RTB.T t a -> RTB.T t a
+dropTime :: (NNC.C t) => t -> RTB.T t a -> RTB.T t a
 dropTime t rtb = case RTB.viewL rtb of
-  Nothing -> rtb
-  Just ((dt, x), rtb') -> case NN.split t dt of
+  Nothing              -> rtb
+  Just ((dt, x), rtb') -> case NNC.split t dt of
     (_, (b, d)) -> if b
       then {- t <= dt -} RTB.cons d x rtb'
       else {- t >  dt -} dropTime d rtb'
@@ -139,12 +146,14 @@ showFraction rat = let
         rdrop0 = reverse . dropWhile (== '0') . reverse
         hundredths = num * q
         in [show whole, ".", rdrop0 $ show hundredths]
-      _ -> [show whole, "+(", show num, "/", show denom, ")"]
+      _      -> [show whole, "+(", show num, "/", show denom, ")"]
 
+-- | Given a list of measure lengths, display a position in terms of its
+-- measure and a beat offset.
 showAsMeasure :: [NN.Rational] -> NN.Rational -> String
 showAsMeasure = go 0 where
   go _  []           _   = error "showAsMeasure: empty measure list"
-  go !m (msr : msrs) pos = case NN.split msr pos of
+  go !m (msr : msrs) pos = case NNC.split msr pos of
     (_, (b, d)) -> if b
       then {- msr <= pos -} go (m + 1) msrs d
       else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
@@ -182,19 +191,19 @@ showBytes ws = "(" ++ intercalate ", " (map showByte ws) ++ ")"
 showEvent :: E.T -> String
 showEvent evt = unwords $ case evt of
   E.MetaEvent meta -> case meta of
-    M.SequenceNum i -> ["seqnum", show i]
-    M.TextEvent s -> ["text", show s]
-    M.Copyright s -> ["copy", show s]
-    M.TrackName s -> ["name", show s]
-    M.InstrumentName s -> ["inst", show s]
-    M.Lyric s -> ["lyric", show s]
-    M.Marker s -> ["mark", show s]
-    M.CuePoint s -> ["cue", show s]
-    M.MIDIPrefix ch -> ["prefix", show $ C.fromChannel ch]
-    M.EndOfTrack -> ["end"]
-    M.SetTempo i -> ["tempo", show i]
+    M.SequenceNum i         -> ["seqnum", show i]
+    M.TextEvent s           -> ["text", show s]
+    M.Copyright s           -> ["copy", show s]
+    M.TrackName s           -> ["name", show s]
+    M.InstrumentName s      -> ["inst", show s]
+    M.Lyric s               -> ["lyric", show s]
+    M.Marker s              -> ["mark", show s]
+    M.CuePoint s            -> ["cue", show s]
+    M.MIDIPrefix ch         -> ["prefix", show $ C.fromChannel ch]
+    M.EndOfTrack            -> ["end"]
+    M.SetTempo i            -> ["tempo", show i]
     M.SMPTEOffset h m s f b -> ["smpte", listParens $ map show [h, m, s, f, b]]
-    M.TimeSig a b c d -> "time" : let
+    M.TimeSig a b c d       -> "time" : let
       rest = guard ((c, d) /= (24, 8)) >> [show c, show d]
       nd = unwords [show a, ":", show $ (2 :: Integer) ^ b]
       in [listParens $ nd : rest]
@@ -209,23 +218,23 @@ showEvent evt = unwords $ case evt of
       c -> ["ch", show c]
     in showChannel ++ case body of
       C.Voice x -> case x of
-        V.NoteOn p v ->
+        V.NoteOn p v         ->
           ["on", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
-        V.NoteOff p v ->
+        V.NoteOff p v        ->
           ["off", show $ V.fromPitch p, "v", show $ V.fromVelocity v]
         V.PolyAftertouch p v -> ["after", show $ V.fromPitch p, "v", show v]
-        V.ProgramChange p -> ["pc", show $ V.fromProgram p]
-        V.Control c v -> ["con", show $ Con.toInt c, "v", show v]
-        V.PitchBend v -> ["bend", show v]
-        V.MonoAftertouch v -> ["after", "v", show v]
+        V.ProgramChange p    -> ["pc", show $ V.fromProgram p]
+        V.Control c v        -> ["con", show $ Con.toInt c, "v", show v]
+        V.PitchBend v        -> ["bend", show v]
+        V.MonoAftertouch v   -> ["after", "v", show v]
       C.Mode x -> case x of
-        Mode.AllSoundOff -> ["soundoff"]
+        Mode.AllSoundOff         -> ["soundoff"]
         Mode.ResetAllControllers -> ["reset"]
-        Mode.LocalControl b -> ["local", if b then "true" else "false"]
-        Mode.AllNotesOff -> ["notesoff"]
-        Mode.OmniMode b -> ["omni", if b then "true" else "false"]
-        Mode.MonoMode i -> ["mono", show i]
-        Mode.PolyMode -> ["poly"]
+        Mode.LocalControl b      -> ["local", if b then "true" else "false"]
+        Mode.AllNotesOff         -> ["notesoff"]
+        Mode.OmniMode b          -> ["omni", if b then "true" else "false"]
+        Mode.MonoMode i          -> ["mono", show i]
+        Mode.PolyMode            -> ["poly"]
   E.SystemExclusive ex -> case ex of
-    SysEx.Regular bytes -> ["sysex", showBytes bytes]
-    SysEx.Escape bytes -> ["escape", showBytes bytes]
+    SysEx.Regular bytes -> ["sysex" , showBytes bytes]
+    SysEx.Escape  bytes -> ["escape", showBytes bytes]

@@ -1,27 +1,29 @@
 {-# LANGUAGE BangPatterns, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-module Sound.MIDI.Script.Read where
+module Sound.MIDI.Script.Read
+( readStandardFile
+) where
 
-import Sound.MIDI.Script.Base
-import Sound.MIDI.Script.Parse
+import Data.Maybe          (mapMaybe)
+import Control.Arrow       (first, second)
+import Control.Applicative ((<|>), liftA2)
+import Data.List           (sortBy, groupBy)
+import Data.Ord            (comparing)
+
+import qualified Data.EventList.Absolute.TimeBody as ATB
+import qualified Data.EventList.Relative.TimeBody as RTB
+import qualified Numeric.NonNegative.Wrapper as NN
+import qualified Sound.MIDI.Controller as Con
 import qualified Sound.MIDI.File.Event as E
 import qualified Sound.MIDI.File.Event.Meta as M
 import qualified Sound.MIDI.File.Event.SystemExclusive as SysEx
-import qualified Sound.MIDI.Message.Channel as C
-import qualified Sound.MIDI.Message.Channel.Voice as V
-import qualified Sound.MIDI.Message.Channel.Mode as Mode
-import qualified Sound.MIDI.Controller as Con
 import qualified Sound.MIDI.KeySignature as Key
+import qualified Sound.MIDI.Message.Channel as C
+import qualified Sound.MIDI.Message.Channel.Mode as Mode
+import qualified Sound.MIDI.Message.Channel.Voice as V
 
-import qualified Numeric.NonNegative.Wrapper as NN
-import qualified Data.EventList.Relative.TimeBody as RTB
-import qualified Data.EventList.Absolute.TimeBody as ATB
-
-import Data.Maybe (mapMaybe)
-import Control.Arrow (first, second)
-import Control.Applicative ((<|>), liftA2)
-import Data.List (sortBy, groupBy)
-import Data.Ord (comparing)
+import Sound.MIDI.Script.Base
+import Sound.MIDI.Script.Parse
 
 readStandardFile :: File -> StandardMIDI E.T
 readStandardFile f = let
