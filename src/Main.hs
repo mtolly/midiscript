@@ -35,11 +35,11 @@ data Flag
 options :: [OptDescr Flag]
 options =
   [ Option ['b'] ["beats"] (NoArg BeatPosns)
-    "positions in beats"
+    "m->t: positions in beats"
   , Option ['m'] ["measures"] (NoArg MeasurePosns)
-    "positions in measures + beats"
+    "m->t: positions in measures + beats"
   , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
-    "minimum resolution for MIDI output"
+    "t->m: MIDI file resolution"
   , Option ['?'] ["usage"] (NoArg Usage)
     "print usage"
   ]
