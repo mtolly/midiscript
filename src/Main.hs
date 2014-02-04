@@ -26,18 +26,19 @@ import Sound.MIDI.Script.Read
 import Sound.MIDI.Script.Scan
 
 data Flag
-  = BeatPosns
-  | MeasurePosns
+  = ShowAs ShowFormat
   | Usage
   | Resolution Integer
   deriving (Eq, Ord, Show, Read)
 
 options :: [OptDescr Flag]
 options =
-  [ Option ['b'] ["beats"] (NoArg BeatPosns)
+  [ Option ['b'] ["beats"] (NoArg $ ShowAs ShowBeats)
     "m->t: positions in beats"
-  , Option ['m'] ["measures"] (NoArg MeasurePosns)
+  , Option ['m'] ["measures"] (NoArg $ ShowAs ShowMeasures)
     "m->t: positions in measures + beats"
+  , Option ['s'] ["seconds"] (NoArg $ ShowAs ShowSeconds)
+    "m->t: most positions in seconds"
   , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
     "t->m: MIDI file resolution"
   , Option ['?'] ["usage"] (NoArg Usage)
@@ -46,9 +47,8 @@ options =
 
 applyFlags :: [Flag] -> Options -> Options
 applyFlags = foldr (.) id . map applyFlag where
-  applyFlag BeatPosns      o = o { measurePosns = False  }
-  applyFlag MeasurePosns   o = o { measurePosns = True   }
-  applyFlag (Resolution r) o = o { resolution   = Just r }
+  applyFlag (ShowAs     f) o = o { showFormat = f }
+  applyFlag (Resolution r) o = o { resolution = Just r }
   applyFlag _              o = o
 
 main :: IO ()

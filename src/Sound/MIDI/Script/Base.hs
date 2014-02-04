@@ -2,6 +2,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Sound.MIDI.Script.Base
 ( Options(..)
+, ShowFormat(..)
 , defaultOptions
 , StandardMIDI(..)
 , toStandardMIDI
@@ -14,8 +15,9 @@ module Sound.MIDI.Script.Base
 import Control.Arrow (first)
 import Control.Monad (guard)
 import Data.Char     (toLower)
+import Data.Fixed    (Milli)
 import Data.List     (sort, sortBy, intercalate)
-import Data.Maybe    (isNothing, fromMaybe, catMaybes, mapMaybe)
+import Data.Maybe    (isJust, isNothing, fromMaybe, catMaybes, mapMaybe)
 import Data.Ord      (comparing)
 import Data.Ratio    (numerator, denominator)
 import Data.Word     (Word8)
@@ -37,14 +39,17 @@ import qualified Sound.MIDI.Message.Channel.Mode       as Mode
 import qualified Sound.MIDI.Message.Channel.Voice      as V
 
 data Options = Options
-  { measurePosns :: Bool
-  , resolution   :: Maybe Integer
+  { showFormat :: ShowFormat
+  , resolution :: Maybe Integer
   } deriving (Eq, Ord, Show, Read)
+
+data ShowFormat = ShowBeats | ShowMeasures | ShowSeconds
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 defaultOptions :: Options
 defaultOptions = Options
-  { measurePosns = False
-  , resolution   = Nothing
+  { showFormat = ShowBeats
+  , resolution = Nothing
   }
 
 data StandardMIDI a = StandardMIDI
@@ -120,6 +125,10 @@ getTimeSig (E.MetaEvent (M.TimeSig n d _ _)) = Just $
   fromIntegral n * (2 ^^ (-d)) * 4
 getTimeSig _ = Nothing
 
+getTempo :: E.T -> Maybe NN.Int
+getTempo (E.MetaEvent (M.SetTempo i)) = Just i
+getTempo _                            = Nothing
+
 -- | Generates an infinite list of measure lengths by reading time signature
 -- events. Assumes 4/4 if there's no event at position 0.
 makeMeasures :: RTB.T NN.Rational E.T -> [NN.Rational]
@@ -158,15 +167,33 @@ showAsMeasure = go 0 where
       then {- msr <= pos -} go (m + 1) msrs d
       else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
 
+-- | Given tempo changes in terms of microseconds per quarter note,
+-- turns a position in beats into a string displaying seconds to 3 places.
+showAsSeconds :: RTB.T NN.Rational NN.Int -> NN.Rational -> String
+showAsSeconds tmps bts = let
+  go !mspb rtb !s !b = case RTB.viewL rtb of
+    Nothing -> s + beatsToSeconds mspb (bts - b)
+    Just ((db, mspb'), rtb') -> if b + db <= bts
+      then go mspb' rtb' (s + beatsToSeconds mspb db) (b + db)
+      else s + beatsToSeconds mspb (bts - b)
+  beatsToSeconds :: NN.Int -> NN.Rational -> NN.Rational
+  beatsToSeconds mspb b = fromIntegral mspb * b / 1000000
+  secs = go 500000 tmps 0 0 -- 500000 mspqn = 120 bpm
+  in show (realToFrac secs :: Milli) ++ "s"
+
 showStandardMIDI :: Options -> StandardMIDI E.T -> String
 showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
+  tmps = RTB.mapMaybe getTempo $ tempoTrack m
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
   showLine (pos, evts) = concat
     [ "  "
-    , if measurePosns opts
-      then showAsMeasure msrs pos
-      else showFraction pos
+    , case showFormat opts of
+        ShowBeats    -> showFraction pos
+        ShowMeasures -> showAsMeasure msrs pos
+        ShowSeconds  -> if any (isJust . getTimeSig) evts
+          then showFraction pos
+          else showAsSeconds tmps pos
     , ": "
     , intercalate ", " (map showEvent evts)
     , ";\n"
