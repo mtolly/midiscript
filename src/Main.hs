@@ -38,7 +38,7 @@ options =
   , Option ['m'] ["measures"] (NoArg $ ShowAs ShowMeasures)
     "m->t: positions in measures + beats"
   , Option ['s'] ["seconds"] (NoArg $ ShowAs ShowSeconds)
-    "m->t: most positions in seconds"
+    "m->t: positions in seconds"
   , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
     "t->m: MIDI file resolution"
   , Option ['?'] ["usage"] (NoArg Usage)

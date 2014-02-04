@@ -17,7 +17,7 @@ import Control.Monad (guard)
 import Data.Char     (toLower)
 import Data.Fixed    (Milli)
 import Data.List     (sort, sortBy, intercalate)
-import Data.Maybe    (isJust, isNothing, fromMaybe, catMaybes, mapMaybe)
+import Data.Maybe    (isNothing, fromMaybe, catMaybes, mapMaybe)
 import Data.Ord      (comparing)
 import Data.Ratio    (numerator, denominator)
 import Data.Word     (Word8)
@@ -191,9 +191,7 @@ showStandardMIDI opts m = let
     , case showFormat opts of
         ShowBeats    -> showFraction pos
         ShowMeasures -> showAsMeasure msrs pos
-        ShowSeconds  -> if any (isJust . getTimeSig) evts
-          then showFraction pos
-          else showAsSeconds tmps pos
+        ShowSeconds  -> showAsSeconds tmps pos
     , ": "
     , intercalate ", " (map showEvent evts)
     , ";\n"
