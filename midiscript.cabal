@@ -1,5 +1,5 @@
 Name:               midiscript
-Version:            0.1
+Version:            0.1.1
 License:            GPL
 Author:             Michael Tolly
 Maintainer:         miketolly@gmail.com
@@ -30,12 +30,12 @@ Executable midiscript
                     , midiscript
   ghc-options:      -Wall
 
-Executable rbncheck
-  Main-Is:          misc/rbncheck.hs
-  Build-Depends:    base           >= 4.6 && < 5
-                    , event-list   >= 0.1 && < 0.2
-                    , midi         >= 0.2 && < 0.3
-                    , non-negative >= 0.1 && < 0.2
-                    , transformers >= 0.3 && < 0.4
-                    , midiscript
-  ghc-options:      -Wall
+-- Executable rbncheck
+--   Main-Is:          misc/rbncheck.hs
+--   Build-Depends:    base           >= 4.6 && < 5
+--                     , event-list   >= 0.1 && < 0.2
+--                     , midi         >= 0.2 && < 0.3
+--                     , non-negative >= 0.1 && < 0.2
+--                     , transformers >= 0.3 && < 0.4
+--                     , midiscript
+--   ghc-options:      -Wall

@@ -2,6 +2,7 @@ module Main where
 
 import qualified Data.Foldable as F
 import Data.List (intercalate)
+import Data.Version (showVersion)
 import System.Console.GetOpt
   ( getOpt, usageInfo, ArgOrder(..), ArgDescr(..), OptDescr(..)
   )
@@ -20,6 +21,7 @@ import qualified Sound.MIDI.File.Load     as Load
 import qualified Sound.MIDI.File.Save     as Save
 import qualified Sound.MIDI.Parser.Report as Report
 
+import Paths_midiscript (version)
 import Sound.MIDI.Script.Base
 import Sound.MIDI.Script.Parse
 import Sound.MIDI.Script.Read
@@ -97,7 +99,8 @@ printUsage :: IO ()
 printUsage = do
   n <- getProgName
   let header = intercalate "\n"
-        [ "Usage: " ++ n ++ " [options] input.mid output.txt"
+        [ "midiscript v" ++ showVersion version
+        , "Usage: " ++ n ++ " [options] input.mid output.txt"
         , "       " ++ n ++ " [options] input.txt output.mid"
         , "Omit arguments or use - for stdin/stdout."
         , "Options:"
