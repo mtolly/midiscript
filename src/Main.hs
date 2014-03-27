@@ -31,6 +31,7 @@ data Flag
   = ShowAs ShowFormat
   | Usage
   | Resolution Integer
+  | SeparateLines
   deriving (Eq, Ord, Show, Read)
 
 options :: [OptDescr Flag]
@@ -41,6 +42,8 @@ options =
     "m->t: positions in measures + beats"
   , Option ['s'] ["seconds"] (NoArg $ ShowAs ShowSeconds)
     "m->t: positions in seconds"
+  , Option ['l'] ["lines"] (NoArg SeparateLines)
+    "m->t: each event on its own line"
   , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
     "t->m: MIDI file resolution"
   , Option ['?'] ["usage"] (NoArg Usage)
@@ -49,9 +52,10 @@ options =
 
 applyFlags :: [Flag] -> Options -> Options
 applyFlags = foldr (.) id . map applyFlag where
-  applyFlag (ShowAs     f) o = o { showFormat = f }
-  applyFlag (Resolution r) o = o { resolution = Just r }
-  applyFlag _              o = o
+  applyFlag (ShowAs     f) o = o { showFormat    = f      }
+  applyFlag (Resolution r) o = o { resolution    = Just r }
+  applyFlag SeparateLines  o = o { separateLines = True   }
+  applyFlag Usage          o = o
 
 main :: IO ()
 main = getArgs >>= \argv -> let

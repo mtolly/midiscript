@@ -39,8 +39,9 @@ import qualified Sound.MIDI.Message.Channel.Mode       as Mode
 import qualified Sound.MIDI.Message.Channel.Voice      as V
 
 data Options = Options
-  { showFormat :: ShowFormat
-  , resolution :: Maybe Integer
+  { showFormat    :: ShowFormat
+  , resolution    :: Maybe Integer
+  , separateLines :: Bool
   } deriving (Eq, Ord, Show, Read)
 
 data ShowFormat = ShowBeats | ShowMeasures | ShowSeconds
@@ -48,8 +49,9 @@ data ShowFormat = ShowBeats | ShowMeasures | ShowSeconds
 
 defaultOptions :: Options
 defaultOptions = Options
-  { showFormat = ShowBeats
-  , resolution = Nothing
+  { showFormat    = ShowBeats
+  , resolution    = Nothing
+  , separateLines = False
   }
 
 data StandardMIDI a = StandardMIDI
@@ -186,16 +188,15 @@ showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
   tmps = RTB.mapMaybe getTempo $ tempoTrack m
   showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
-  showLine (pos, evts) = concat
-    [ "  "
-    , case showFormat opts of
-        ShowBeats    -> showFraction pos
-        ShowMeasures -> showAsMeasure msrs pos
-        ShowSeconds  -> showAsSeconds tmps pos
-    , ": "
-    , intercalate ", " (map showEvent evts)
-    , ";\n"
-    ]
+  showLine (pos, evts) = let
+    posStr = case showFormat opts of
+      ShowBeats    -> showFraction pos
+      ShowMeasures -> showAsMeasure msrs pos
+      ShowSeconds  -> showAsSeconds tmps pos
+    oneLine stuff = concat ["  ", posStr, ": ", stuff, ";\n"]
+    in if separateLines opts
+      then concatMap (oneLine . showEvent) evts
+      else oneLine $ intercalate ", " (map showEvent evts)
   sortedTracks = sortBy (comparing fst) $ namedTracks m
   allTracks = ("tempo", tempoTrack m) : named
   named = map (first show) sortedTracks
