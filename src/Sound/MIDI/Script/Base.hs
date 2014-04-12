@@ -42,6 +42,7 @@ data Options = Options
   { showFormat    :: ShowFormat
   , resolution    :: Maybe Integer
   , separateLines :: Bool
+  , matchNoteOff  :: Bool
   } deriving (Eq, Ord, Show, Read)
 
 data ShowFormat = ShowBeats | ShowMeasures | ShowSeconds
@@ -52,6 +53,7 @@ defaultOptions = Options
   { showFormat    = ShowBeats
   , resolution    = Nothing
   , separateLines = False
+  , matchNoteOff  = False
   }
 
 data StandardMIDI a = StandardMIDI
@@ -187,7 +189,11 @@ showStandardMIDI :: Options -> StandardMIDI E.T -> String
 showStandardMIDI opts m = let
   msrs = makeMeasures $ tempoTrack m
   tmps = RTB.mapMaybe getTempo $ tempoTrack m
-  showTrack t = "{\n" ++ concatMap showLine (standardTrack t) ++ "}"
+  toEventOrNotes trk = if matchNoteOff opts
+    then matchEvents trk
+    else fmap Event trk
+  showTrack t =
+    "{\n" ++ concatMap showLine (standardTrack $ toEventOrNotes t) ++ "}"
   showLine (pos, evts) = let
     posStr = case showFormat opts of
       ShowBeats    -> showFraction pos
@@ -195,15 +201,15 @@ showStandardMIDI opts m = let
       ShowSeconds  -> showAsSeconds tmps pos
     oneLine stuff = concat ["  ", posStr, ": ", stuff, ";\n"]
     in if separateLines opts
-      then concatMap (oneLine . showEvent) evts
-      else oneLine $ intercalate ", " (map showEvent evts)
+      then concatMap (oneLine . showEventOrNote) evts
+      else oneLine $ intercalate ", " (map showEventOrNote evts)
   sortedTracks = sortBy (comparing fst) $ namedTracks m
   allTracks = ("tempo", tempoTrack m) : named
   named = map (first show) sortedTracks
   in concatMap (\(n, t) -> n ++ " ch 0 " ++ showTrack t ++ "\n\n") allTracks
 
 -- | Groups events by absolute time, and sorts concurrent events.
-standardTrack :: RTB.T NN.Rational E.T -> [(NN.Rational, [E.T])]
+standardTrack :: (Ord a) => RTB.T NN.Rational a -> [(NN.Rational, [a])]
 standardTrack = ATB.toPairList . RTB.toAbsoluteEventList 0
   . fmap sort . RTB.collectCoincident
 
@@ -213,6 +219,50 @@ showBytes ws = "(" ++ intercalate ", " (map showByte ws) ++ ")"
           ""  -> "00"
           [c] -> ['0', c]
           hex -> hex
+
+matchEvents :: (NNC.C t) => RTB.T t E.T -> RTB.T t (EventOrNote t)
+matchEvents rtb = case RTB.viewL rtb of
+  Nothing -> RTB.empty
+  Just ((dt, x), rtb') -> case x of
+    E.MIDIEvent (C.Cons c (C.Voice (V.NoteOn p v))) | V.fromVelocity v /= 0
+      -> case findOff c p rtb' of
+        Nothing         -> RTB.cons dt (Event x) $ matchEvents rtb'
+        Just (t, rtb'') -> RTB.cons dt (Note c p v t) $ matchEvents rtb''
+    _ -> RTB.cons dt (Event x) $ matchEvents rtb'
+
+data EventOrNote t
+  = Event E.T
+  | Note C.Channel V.Pitch V.Velocity t
+  deriving (Eq, Ord, Show)
+
+-- | Tries to locate the note-off for a certain channel and pitch.
+-- If found, returns its position, and the event-list with the note-off removed.
+findOff
+  :: (NNC.C t) => C.Channel -> V.Pitch -> RTB.T t E.T -> Maybe (t, RTB.T t E.T)
+findOff c p rtb = case RTB.viewL rtb of
+  Nothing -> Nothing
+  Just ((dt, x), rtb') -> case x of
+    E.MIDIEvent (C.Cons c' (C.Voice (V.NoteOn p' v)))
+      | (c, p, 0) == (c', p', V.fromVelocity v)
+      -> Just (dt, RTB.delay dt rtb')
+    E.MIDIEvent (C.Cons c' (C.Voice (V.NoteOff p' _)))
+      | (c, p) == (c', p')
+      -> Just (dt, RTB.delay dt rtb')
+    _ -> case findOff c p rtb' of
+      Nothing -> Nothing
+      Just (t, rtb'') -> Just (NNC.add dt t, RTB.cons dt x rtb'')
+
+showEventOrNote :: EventOrNote NN.Rational -> String
+showEventOrNote (Event x) = showEvent x
+showEventOrNote (Note c p v len) = let
+  ch = case C.fromChannel c of
+    0  -> []
+    ci -> ["ch", show ci]
+  in unwords $ ch ++
+    [ "on", show $ V.fromPitch p
+    , "v", show $ V.fromVelocity v
+    , "len", showFraction len
+    ]
 
 showEvent :: E.T -> String
 showEvent evt = unwords $ case evt of

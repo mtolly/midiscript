@@ -33,6 +33,7 @@ data Flag
   | Usage
   | Resolution Integer
   | SeparateLines
+  | MatchNoteOff
   deriving (Eq, Ord, Show, Read)
 
 options :: [OptDescr Flag]
@@ -45,6 +46,8 @@ options =
     "m->t: positions in seconds"
   , Option ['l'] ["lines"] (NoArg SeparateLines)
     "m->t: each event on its own line"
+  , Option ['o'] ["matchoff"] (NoArg MatchNoteOff)
+    "m->t: write note on/off as a single event"
   , Option ['r'] ["resolution"] (ReqArg (Resolution . read) "int")
     "t->m: MIDI file resolution"
   , Option ['?'] ["usage"] (NoArg Usage)
@@ -56,6 +59,7 @@ applyFlags = foldr (.) id . map applyFlag where
   applyFlag (ShowAs     f) o = o { showFormat    = f      }
   applyFlag (Resolution r) o = o { resolution    = Just r }
   applyFlag SeparateLines  o = o { separateLines = True   }
+  applyFlag MatchNoteOff   o = o { matchNoteOff  = True   }
   applyFlag Usage          o = o
 
 main :: IO ()
