@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Wraps mididiff in a script suitable for git to use.
+# Add this to your .git/config:
+
+# [diff]
+#   external = git-mididiff
+
+oldext=${2#*.}
+newext=${5#*.}
+if [[ "$oldext" = mid && "$newext" = mid ]]
+then
+  mididiff "$2" "$5" | cat
+elif [[ "$2" = /dev/null && "$newext" = mid ]]
+then
+  emptymid=/tmp/mididiff-$$.$RANDOM
+  echo "" | midiscript > $emptymid
+  mididiff "$emptymid" "$5" | cat
+elif [[ "$oldext" = mid && "$5" = /dev/null ]]
+then
+  emptymid=/tmp/mididiff-$$.$RANDOM
+  echo "" | midiscript > $emptymid
+  mididiff "$2" "$emptymid" | cat
+else
+  git diff --no-index "$2" "$5" | cat
+fi

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Shows a color diff of two midis.
+# Uses -o (note on/off as one event) and -m (positions as measures|beats).
+
+oldtxt=/tmp/mididiff-old-$$.$RANDOM
+newtxt=/tmp/mididiff-new-$$.$RANDOM
+
+midiscript -om $1 $oldtxt
+midiscript -om $2 $newtxt
+colordiff $oldtxt $newtxt -u -F "{"
+
+rm $oldtxt $newtxt
