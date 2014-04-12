@@ -13,13 +13,14 @@ import System.IO
   , stdin, stdout, stderr
   )
 
-import qualified Data.ByteString          as B
-import qualified Data.ByteString.Lazy     as L
-import qualified Data.Text.Lazy           as TL
-import qualified Data.Text.Lazy.Encoding  as Enc
-import qualified Sound.MIDI.File.Load     as Load
-import qualified Sound.MIDI.File.Save     as Save
-import qualified Sound.MIDI.Parser.Report as Report
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Lazy       as L
+import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.Text.Lazy             as TL
+import qualified Data.Text.Lazy.Encoding    as Enc
+import qualified Sound.MIDI.File.Load       as Load
+import qualified Sound.MIDI.File.Save       as Save
+import qualified Sound.MIDI.Parser.Report   as Report
 
 import Paths_midiscript (version)
 import Sound.MIDI.Script.Base
@@ -80,17 +81,13 @@ handles :: Options -> Handle -> Handle -> IO ()
 handles opts h1 h2 = do
   hSetBinaryMode h1 True
   b1 <- fmap (L.fromChunks . (: [])) $ B.hGetContents h1
-  let rep = Load.maybeFromByteString b1
-  case Report.result rep of
-    Right mid -> case toStandardMIDI mid of
+  if L.take 4 b1 == L8.pack "MThd"
+    then case Report.result (Load.maybeFromByteString b1) >>= toStandardMIDI of
       Right sm -> do
         hSetBinaryMode h2 False
         hPutStr h2 $ showStandardMIDI opts sm
-      Left err -> do
-        mapM_ (hPutStrLn stderr)
-          ["Error converting MIDI file to standard form.", err]
-        exitFailure
-    Left _ -> let
+      Left err -> error err
+    else let
       s1 = TL.unpack $ Enc.decodeUtf8 b1
       sm = readStandardFile $ parse $ scan s1
       in do
