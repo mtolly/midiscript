@@ -9,7 +9,7 @@ Category:           Data
 
 Library
   Build-Depends:    base           >= 4.6   && < 5
-                    , array        >= 0.4   && < 0.5
+                    , array        >= 0.4   && < 0.6
                     , event-list   >= 0.1   && < 0.2
                     , midi         >= 0.2   && < 0.3
                     , non-negative >= 0.1   && < 0.2
