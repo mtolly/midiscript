@@ -6,7 +6,7 @@ module Sound.MIDI.Script.Read
 
 import Data.Maybe          (mapMaybe)
 import Control.Arrow       (first, second)
-import Control.Applicative ((<|>), liftA2)
+import Control.Applicative ((<|>), liftA2, (<$>))
 import Data.List           (sortBy, groupBy)
 import Data.Ord            (comparing)
 
@@ -106,9 +106,9 @@ isRational n = case n of
   Sub  x y -> liftA2 (-) (isRational x) (isRational y)
   Mult x y -> liftA2 (*) (isRational x) (isRational y)
   Div  x y -> liftA2 (/) (isRational x) (isRational y)
-  Abs    x -> fmap abs $ isRational x
-  Signum x -> fmap signum $ isRational x
-  Log2   x -> fmap (fromIntegral . log2 . floor) $ isRational x
+  Abs    x -> abs                         <$> isRational x
+  Signum x -> signum                      <$> isRational x
+  Log2   x -> fromIntegral . log2 . floor <$> isRational x
 
 -- | Tries to evaluate the number as a number of measures and a number of beats,
 -- without using time signatures or tempos.
@@ -143,9 +143,9 @@ isMeasureBeats' msrs n = case n of
   Sub  x y -> liftA2 (-) (rec x) (rec y)
   Mult x y -> liftA2 (*) (rec x) (rec y)
   Div  x y -> liftA2 (/) (rec x) (rec y)
-  Abs    x -> fmap abs $ rec x
-  Signum x -> fmap signum $ rec x
-  Log2   x -> fmap (fromIntegral . log2 . floor) $ rec x
+  Abs    x -> abs                         <$> rec x
+  Signum x -> signum                      <$> rec x
+  Log2   x -> fromIntegral . log2 . floor <$> rec x
   where rec = isMeasureBeats' msrs
 
 isSeconds :: Number -> Maybe Rational
@@ -160,9 +160,9 @@ isSeconds n = case n of
   Sub  x y -> liftA2 (-) (isSeconds x) (isSeconds y)
   Mult x y -> liftA2 (*) (isSeconds x) (isSeconds y)
   Div  x y -> liftA2 (/) (isSeconds x) (isSeconds y)
-  Abs    x -> fmap abs $ isSeconds x
-  Signum x -> fmap signum $ isSeconds x
-  Log2   x -> fmap (fromIntegral . log2 . floor) $ isSeconds x
+  Abs    x -> abs                         <$> isSeconds x
+  Signum x -> signum                      <$> isSeconds x
+  Log2   x -> fromIntegral . log2 . floor <$> isSeconds x
 
 -- | Tries to parse a legal time signature event into
 -- (measures, non-negative beats, signature's measure length).
