@@ -8,6 +8,6 @@ newtxt=/tmp/mididiff-new-$$.$RANDOM
 
 midiscript -om $1 $oldtxt
 midiscript -om $2 $newtxt
-colordiff $oldtxt $newtxt -u -F "{"
+git diff --no-index $oldtxt $newtxt | cat
 
 rm $oldtxt $newtxt
