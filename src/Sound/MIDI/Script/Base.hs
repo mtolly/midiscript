@@ -12,7 +12,7 @@ module Sound.MIDI.Script.Base
 , showAsMeasure
 ) where
 
-import Control.Arrow (first)
+import Control.Arrow (first, second)
 import Control.Monad (guard)
 import Data.Char     (toLower)
 import Data.Fixed    (Milli)
@@ -25,7 +25,8 @@ import Numeric       (showHex)
 
 import qualified Data.EventList.Absolute.TimeBody      as ATB
 import qualified Data.EventList.Relative.TimeBody      as RTB
-import Data.List.HT (partitionMaybe)
+import           Data.List.HT                          (partitionMaybe)
+import qualified Data.Map                              as Map
 import qualified Numeric.NonNegative.Class             as NNC
 import qualified Numeric.NonNegative.Wrapper           as NN
 import qualified Sound.MIDI.Controller                 as Con
@@ -161,15 +162,12 @@ showFraction rat = let
         in [show whole, ".", rdrop0 $ show hundredths]
       _      -> [show whole, "+(", show num, "/", show denom, ")"]
 
--- | Given a list of measure lengths, display a position in terms of its
--- measure and a beat offset.
-showAsMeasure :: [NN.Rational] -> NN.Rational -> String
-showAsMeasure = go 0 where
-  go _  []           _   = error "showAsMeasure: empty measure list"
-  go !m (msr : msrs) pos = case NNC.split msr pos of
-    (_, (b, d)) -> if b
-      then {- msr <= pos -} go (m + 1) msrs d
-      else {- msr >  pos -} concat [show (m :: Integer), "|", showFraction pos]
+-- | Given a map of measure starts to measure numbers,
+-- display a position in terms of its measure and a beat offset.
+showAsMeasure :: Map.Map NN.Rational Int -> NN.Rational -> String
+showAsMeasure msrs posn = case Map.lookupLE posn msrs of
+  Nothing -> error $ "showAsMeasure: couldn't find a measure before position " ++ show posn
+  Just (msrStart, msrNumber) -> concat [show msrNumber, "|", showFraction $ posn - msrStart]
 
 -- | Given tempo changes in terms of microseconds per quarter note,
 -- turns a position in beats into a string displaying seconds to 3 places.
@@ -187,17 +185,23 @@ showAsSeconds tmps bts = let
 
 showStandardMIDI :: Options -> StandardMIDI E.T -> String
 showStandardMIDI opts m = let
-  msrs = makeMeasures $ tempoTrack m
+  msrLengths = makeMeasures $ tempoTrack m
+  msrStarts = scanl (+) 0 msrLengths
+  lastEventPosn = foldr max 0 $ flip map stdTracks $ \(_, t) -> if null t
+    then 0
+    else last $ map fst t
+  msrMap :: Map.Map NN.Rational Int
+  msrMap = Map.fromDistinctAscList $
+    zip (takeWhile (<= lastEventPosn) msrStarts) [0..]
   tmps = RTB.mapMaybe getTempo $ tempoTrack m
   toEventOrNotes trk = if matchNoteOff opts
     then matchEvents trk
     else fmap Event trk
-  showTrack t =
-    "{\n" ++ concatMap showLine (standardTrack $ toEventOrNotes t) ++ "}"
+  showStdTrack t = "{\n" ++ concatMap showLine t ++ "}"
   showLine (pos, evts) = let
     posStr = case showFormat opts of
       ShowBeats    -> showFraction pos
-      ShowMeasures -> showAsMeasure msrs pos
+      ShowMeasures -> showAsMeasure msrMap pos
       ShowSeconds  -> showAsSeconds tmps pos
     oneLine stuff = concat ["  ", posStr, ": ", stuff, ";\n"]
     in if separateLines opts
@@ -205,8 +209,9 @@ showStandardMIDI opts m = let
       else oneLine $ intercalate ", " (map showEventOrNote evts)
   sortedTracks = sortBy (comparing fst) $ namedTracks m
   allTracks = ("tempo", tempoTrack m) : named
+  stdTracks = map (second $ standardTrack . toEventOrNotes) allTracks
   named = map (first show) sortedTracks
-  in concatMap (\(n, t) -> n ++ " ch 0 " ++ showTrack t ++ "\n\n") allTracks
+  in concatMap (\(n, t) -> n ++ " ch 0 " ++ showStdTrack t ++ "\n\n") stdTracks
 
 -- | Groups events by absolute time, and sorts concurrent events.
 standardTrack :: (Ord a) => RTB.T NN.Rational a -> [(NN.Rational, [a])]
