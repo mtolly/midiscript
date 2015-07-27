@@ -1,13 +1,38 @@
 #!/bin/bash
+set -e
+set -u
 
-# Shows a color diff of two midis.
-# Uses -o (note on/off as one event) and -m (positions as measures|beats).
+if [ "$#" -ne 2 ]; then
+  DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+  SCRIPT=$(basename "$0")
 
-oldtxt=/tmp/mididiff-old-$$.$RANDOM
-newtxt=/tmp/mididiff-new-$$.$RANDOM
+  echo "Usage: $0 new.mid old.mid"
+  echo "Or, use something like the following to set up with git:"
+  echo "  echo '*.mid diff=midi' > ~/.gitattributes"
+  echo "  git config --global core.attributesfile '~/.gitattributes'"
+  echo "  git config --global diff.midi.command '$DIR/$SCRIPT'"
+  exit 1
+fi
 
-midiscript -om $1 $oldtxt
-midiscript -om $2 $newtxt
+if [ "$2" != "/dev/null" ]; then
+  oldtxt=/tmp/mididiff-old-$$.$RANDOM
+  midiscript -om "$2" "$oldtxt"
+else
+  oldtxt=/dev/null
+fi
+
+if [ "$1" != "/dev/null" ]; then
+  newtxt=/tmp/mididiff-new-$$.$RANDOM
+  midiscript -om "$1" "$newtxt"
+else
+  newtxt=/dev/null
+fi
+
 git diff --no-index $oldtxt $newtxt | cat
 
-rm $oldtxt $newtxt
+if [ "$2" != "/dev/null" ]; then
+  rm "$oldtxt"
+fi
+if [ "$1" != "/dev/null" ]; then
+  rm "$newtxt"
+fi
