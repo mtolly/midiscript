@@ -27,7 +27,7 @@ Executable midiscript
   Build-Depends:    base         >= 4.6  && < 5
                     , bytestring >= 0.10 && < 0.11
                     , midi       >= 0.2  && < 0.3
-                    , text       >= 0.11 && < 0.12
+                    , text       >= 0.11 && < 1.3
                     , midiscript
   ghc-options:      -Wall
 
