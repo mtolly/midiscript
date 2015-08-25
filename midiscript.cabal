@@ -21,6 +21,7 @@ Library
                     Sound.MIDI.Script.Read
   hs-source-dirs:   src
   ghc-options:      -Wall
+  Build-Tools:      alex, happy
 
 Executable midiscript
   Main-Is:          src/Main.hs

@@ -8,4 +8,4 @@ extra-deps:
 - utility-ht-0.0.10
 - explicit-exception-0.1.7.3
 - monoid-transformer-0.0.3
-resolver: nightly-2015-07-26
+resolver: lts-3.1
