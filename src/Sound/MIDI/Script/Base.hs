@@ -157,9 +157,11 @@ showFraction rat = let
     then show (whole :: Integer)
     else concat $ case quotRem 100 denom of
       (q, 0) -> let -- show decimal if 2 or less places
-        rdrop0 = reverse . dropWhile (== '0') . reverse
-        hundredths = num * q
-        in [show whole, ".", rdrop0 $ show hundredths]
+        hundredths = case show $ num * q of
+          [d]      -> ['0', d]
+          [d, '0'] -> [d]
+          s        -> s
+        in [show whole, ".", hundredths]
       _      -> [show whole, "+(", show num, "/", show denom, ")"]
 
 -- | Given a map of measure starts to measure numbers,
